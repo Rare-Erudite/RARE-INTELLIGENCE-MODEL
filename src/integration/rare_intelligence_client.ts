@@ -140,6 +140,19 @@ export class RareIntelligenceClient {
     return data.conversation;
   }
 
+  public async renameConversation(id: string, title: string): Promise<any> {
+    const data = await this.request<{ success: boolean; conversation: any }>(`/api/v1/conversations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ title }),
+    });
+    return data.conversation;
+  }
+
+  public async getConversationMessages(id: string): Promise<any[]> {
+    const data = await this.request<{ success: boolean; messages: any[] }>(`/api/v1/conversations/${id}/messages`);
+    return data.messages;
+  }
+
   public async listConversations(): Promise<any[]> {
     const data = await this.request<{ success: boolean; conversations: any[] }>('/api/v1/conversations');
     return data.conversations;

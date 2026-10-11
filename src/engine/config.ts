@@ -1,10 +1,8 @@
-/**
- * RARE-INTELLIGENCE — Engine Configuration & Zero-Budget Guardrails
- */
+import 'dotenv/config';
 
 export interface EngineConfig {
   engineVersion: string;
-  defaultProvider: 'gemini' | 'ollama' | 'diagnostic-mock';
+  defaultProvider: 'local-transformers' | 'gemini' | 'ollama' | 'diagnostic-mock';
   zeroBudgetPolicy: {
     strictlyFreeOnly: boolean;
     forbidPaidFallbacks: boolean;
@@ -30,7 +28,7 @@ export interface EngineConfig {
 
 export const DEFAULT_CONFIG: EngineConfig = {
   engineVersion: '1.0.0-rc1',
-  defaultProvider: 'gemini',
+  defaultProvider: 'local-transformers',
   zeroBudgetPolicy: {
     strictlyFreeOnly: true,
     forbidPaidFallbacks: true,

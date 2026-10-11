@@ -64,6 +64,8 @@ export class AppError extends Error {
       case 'TIMEOUT_OR_CANCELLED':
         return 408;
       case 'PROVIDER_UNAVAILABLE':
+      case 'NO_AI_PROVIDER_READY':
+      case 'NETWORK_OFFLINE':
       case 'NETWORK_FAILURE':
       case 'CIRCUIT_BREAKER_OPEN':
       case 'SERVICE_UNAVAILABLE':

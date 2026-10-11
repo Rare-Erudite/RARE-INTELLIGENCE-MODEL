@@ -173,9 +173,10 @@ X-API-Key: <RARE_API_KEY>
 ```dart
 import 'rare_intelligence_client.dart';
 
+// Configure authorized endpoint and secure key via environment or Flutter secure storage
 final client = RareIntelligenceClient(
-  baseUrl: 'https://your-engine-host.domain', // Or http://10.0.2.2:3000 for Android emulator
-  apiKey: 'rare_client_sec_token_0budget',
+  baseUrl: const String.fromEnvironment('RARE_ENGINE_URL', defaultValue: 'http://10.0.2.2:3000'), // 10.0.2.2 for Android emulator
+  apiKey: const String.fromEnvironment('RARE_API_KEY', defaultValue: ''), // Injected via --dart-define
 );
 
 // 1. Check health before initiating UI flow

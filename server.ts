@@ -4,10 +4,10 @@
  * Centralized typed error handling, resilience, and versioned v1 REST API for RARE-THE-SIXTH.
  */
 
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
 import { engine } from './src/engine/engine.js';
 import { EngineTestSuiteRunner } from './src/engine/tests/engine-test-suite.js';
 import { STANDARD_BENCHMARK_TASKS } from './src/engine/continuous-improvement/benchmark-suite.js';
@@ -17,8 +17,6 @@ import { DeviceHardwareEvaluator } from './src/engine/providers/device-evaluator
 import { LocalModelManager } from './src/engine/providers/local-runtime.js';
 import { authManager } from './src/engine/security/auth.js';
 import { defaultSecurityGuard } from './src/engine/security/permissions.js';
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -183,6 +181,22 @@ apiRouter.post('/providers/load-local', authManager.requireRole(['client', 'deve
       manifest: localProvider.manifest,
       activeProvider: 'local-transformers',
       message: `Local open-weight model "${localProvider.manifest.name}" successfully loaded into memory and active for neural inference.`,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+apiRouter.post('/providers/unload-local', authManager.requireRole(['client', 'developer']), async (_req, res, next) => {
+  try {
+    const localProvider = engine.providers.getProvider('local-transformers') as any;
+    if (localProvider) {
+      localProvider.unload();
+    }
+    res.json({
+      success: true,
+      activeProvider: engine.providers.getActiveProvider().id,
+      message: 'Local open-weight model successfully unloaded from memory.',
     });
   } catch (err) {
     next(err);

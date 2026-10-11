@@ -59,12 +59,37 @@ export class LocalTransformersProvider implements IModelProvider {
     logger.info('LocalTransformersProvider', `Initialized local neural model adapter for ${this.manifest.name}`);
   }
 
+  public getCacheDir(): string {
+    if (process.env.MODELS_CACHE_DIR) {
+      return path.resolve(process.env.MODELS_CACHE_DIR);
+    }
+    if (fs.existsSync('/tmp')) {
+      return '/tmp/models_cache';
+    }
+    return path.resolve(process.cwd(), 'data/models_cache');
+  }
+
   public hasCachedWeights(): boolean {
-    const candidatePath = path.resolve(
-      process.cwd(),
-      'data/models_cache/onnx-community/Qwen2.5-0.5B-Instruct/onnx/model_q4.onnx'
-    );
-    return fs.existsSync(candidatePath);
+    const candidateDirs = [
+      this.getCacheDir(),
+      '/tmp/models_cache',
+      path.resolve(process.cwd(), 'data/models_cache'),
+    ];
+    for (const dir of candidateDirs) {
+      const candidatePath = path.resolve(
+        dir,
+        'onnx-community/Qwen2.5-0.5B-Instruct/onnx/model_q4.onnx'
+      );
+      if (fs.existsSync(candidatePath)) {
+        try {
+          const stat = fs.statSync(candidatePath);
+          if (stat.size > 50_000_000) return true;
+        } catch {
+          // ignore
+        }
+      }
+    }
+    return false;
   }
 
   public get isReady(): boolean {
@@ -98,8 +123,8 @@ export class LocalTransformersProvider implements IModelProvider {
       logger.info('LocalTransformersProvider', `Loading ${this.modelIdentifier} on CPU...`);
       const { pipeline, env } = await import('@huggingface/transformers');
 
-      // Configure cache directory within workspace
-      env.cacheDir = './data/models_cache';
+      // Configure cache directory
+      env.cacheDir = this.getCacheDir();
 
       if (onProgress) onProgress(25, 'Downloading / verifying quantized ONNX weights...');
       this.loadProgressPercent = 25;
@@ -222,12 +247,21 @@ export class LocalTransformersProvider implements IModelProvider {
 
       // Strip prompt prefix if echoed by generator
       let responseText = fullGenerated;
-      if (responseText.startsWith(promptString)) {
+      if (responseText.includes('assistant\n')) {
+        responseText = responseText.substring(responseText.lastIndexOf('assistant\n') + 'assistant\n'.length).trim();
+      } else if (responseText.startsWith(promptString)) {
         responseText = responseText.substring(promptString.length).trim();
       }
 
-      // Clean assistant tags
-      responseText = responseText.replace(/<\|im_end\|>.*$/s, '').trim();
+      // Clean assistant and special tags
+      responseText = responseText
+        .replace(/<\|im_end\|>.*$/s, '')
+        .replace(/<\|endoftext\|>.*$/s, '')
+        .trim();
+
+      if (!responseText) {
+        responseText = 'Model response generated.';
+      }
 
       const latencyMs = Date.now() - startTime;
       const estimatedOutputTokens = Math.ceil(responseText.length / 4);
@@ -257,5 +291,10 @@ export class LocalTransformersProvider implements IModelProvider {
     this.isLoaded = false;
     this.manifest.isLoaded = false;
     logger.info('LocalTransformersProvider', `Model ${this.manifest.name} unloaded from memory.`);
+  }
+
+  public async reloadModel(): Promise<boolean> {
+    this.unload();
+    return await this.loadModel();
   }
 }

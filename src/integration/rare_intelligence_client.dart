@@ -37,6 +37,10 @@ class RareIntelligenceException implements Exception {
 class EngineStatusInfo {
   final bool isEngineRunning;
   final bool isAiProviderReady;
+  final bool isStorageAvailable;
+  final bool isStoragePersistent;
+  final bool isModelInstalled;
+  final bool isModelLoaded;
   final String operationalState;
   final String activeProvider;
   final String modelIdentifier;
@@ -46,6 +50,10 @@ class EngineStatusInfo {
   EngineStatusInfo({
     required this.isEngineRunning,
     required this.isAiProviderReady,
+    required this.isStorageAvailable,
+    required this.isStoragePersistent,
+    required this.isModelInstalled,
+    required this.isModelLoaded,
     required this.operationalState,
     required this.activeProvider,
     required this.modelIdentifier,
@@ -67,13 +75,20 @@ class EngineStatusInfo {
     );
 
     final isProviderReady = activeProviderObj != null && activeProviderObj['isAvailable'] == true;
+    final localModelAvail = report?['localModelAvailable'] as bool? ?? false;
+    final storageAvail = report?['localStorageAvailable'] as bool? ?? true;
+    final isPersistent = (health['memoryStorageType'] as String?)?.contains('persistent') ?? true;
 
     return EngineStatusInfo(
       isEngineRunning: true,
       isAiProviderReady: isProviderReady,
+      isStorageAvailable: storageAvail,
+      isStoragePersistent: isPersistent,
+      isModelInstalled: localModelAvail,
+      isModelLoaded: isProviderReady && (activeProvider == 'local-transformers'),
       operationalState: operationalState,
       activeProvider: activeProvider,
-      modelIdentifier: activeProviderObj?['modelIdentifier'] ?? 'diagnostic-mock',
+      modelIdentifier: activeProviderObj?['modelIdentifier'] ?? 'local-transformers',
       isOnline: isOnline,
       summaryMessage: report?['summaryMessage'] ?? 'Engine active.',
     );
@@ -259,6 +274,30 @@ class RareIntelligenceClient {
     return await _post('/api/v1/conversations/$conversationId/messages', body);
   }
 
+  /// Rename an existing conversation
+  Future<Map<String, dynamic>> renameConversation(String id, String newTitle) async {
+    final body = {'title': newTitle};
+    return await _patch('/api/v1/conversations/$id', body);
+  }
+
+  /// Get messages in conversation
+  Future<List<dynamic>> getConversationMessages(String id) async {
+    final json = await _get('/api/v1/conversations/$id/messages');
+    return (json['messages'] as List<dynamic>?) ?? [];
+  }
+
+  /// Conduct grounded research over notes
+  Future<Map<String, dynamic>> conductResearch(String topic, {List<String> notes = const []}) async {
+    final body = {'topic': topic, 'notes': notes};
+    return await _post('/api/v1/assistant/research', body);
+  }
+
+  /// Parse document contents (CSV, JSON, Markdown, Text, PDF)
+  Future<Map<String, dynamic>> parseDocument(String filename, String content) async {
+    final body = {'filename': filename, 'content': content};
+    return await _post('/api/v1/assistant/document-parse', body);
+  }
+
   /// Explicitly trigger loading local neural open-weights into memory
   Future<Map<String, dynamic>> loadLocalModel() async {
     return await _post('/api/v1/providers/load-local', {});
@@ -295,6 +334,35 @@ class RareIntelligenceClient {
     try {
       final uri = Uri.parse('$_cleanBaseUrl$path');
       final request = await _httpClient.postUrl(uri).timeout(timeout);
+      _setHeaders(request);
+
+      final bytes = utf8.encode(jsonEncode(body));
+      request.headers.set('Content-Type', 'application/json; charset=utf-8');
+      request.add(bytes);
+
+      final response = await request.close().timeout(timeout);
+      return _processResponse(response);
+    } on SocketException catch (e) {
+      throw RareIntelligenceException(
+        code: 'NETWORK_FAILURE',
+        message: 'Unable to reach RARE-INTELLIGENCE server: ${e.message}',
+        statusCode: 503,
+        isTransient: true,
+      );
+    } on TimeoutException {
+      throw RareIntelligenceException(
+        code: 'TIMEOUT_OR_CANCELLED',
+        message: 'Request timed out waiting for RARE-INTELLIGENCE server.',
+        statusCode: 504,
+        isTransient: true,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> _patch(String path, Map<String, dynamic> body) async {
+    try {
+      final uri = Uri.parse('$_cleanBaseUrl$path');
+      final request = await _httpClient.patchUrl(uri).timeout(timeout);
       _setHeaders(request);
 
       final bytes = utf8.encode(jsonEncode(body));

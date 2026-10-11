@@ -2,16 +2,16 @@
   "metadata": {
     "schemaVersion": 2,
     "engineVersion": "1.0.0-rc1",
-    "checksum": "13b20c2013ffdcd323874f55d9bbc6242200d84f239d2f973a85df7a9d00521b",
-    "updatedAt": 1791728585397,
-    "lastBackupAt": 1791727583301,
+    "checksum": "69d09eb00fc1d6ca20b1b5f4f9cbf83af5ba522f5dac7ffa9ccf557d39d4821f",
+    "updatedAt": 1791734131142,
+    "lastBackupAt": 1791733776163,
     "filesystemDurability": "ephemeral_sandbox",
     "itemCounts": {
       "memories": 4,
-      "conversations": 0,
-      "tasks": 4,
-      "diagnostics": 10,
-      "repairs": 10,
+      "conversations": 2,
+      "tasks": 9,
+      "diagnostics": 15,
+      "repairs": 15,
       "checkpoints": 0,
       "auditEvents": 0
     }
@@ -77,7 +77,42 @@
       "isPersistent": true
     }
   },
-  "conversations": {},
+  "conversations": {
+    "conv_test_cycle_1791728585494": {
+      "id": "conv_test_cycle_1791728585494",
+      "title": "Integration Test Conversation",
+      "createdAt": 1791728585494,
+      "updatedAt": 1791728585494,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello RARE-INTELLIGENCE",
+          "timestamp": 1791728585494
+        },
+        {
+          "role": "model",
+          "content": "Greetings. Offline-first intelligence ready.",
+          "timestamp": 1791728585504
+        },
+        {
+          "role": "user",
+          "content": "Testing cold restart durability",
+          "timestamp": 1791728585514
+        }
+      ],
+      "metadata": {
+        "source": "test-runner"
+      }
+    },
+    "conv_eida7qp": {
+      "id": "conv_eida7qp",
+      "title": "RARE-THE-SIXTH Integration Test Chat",
+      "createdAt": 1791728624145,
+      "updatedAt": 1791728624145,
+      "messages": [],
+      "metadata": {}
+    }
+  },
   "tasks": {
     "undefined": {
       "taskId": "task_0nipygg",
@@ -329,6 +364,321 @@
         "currentIteration": 0
       },
       "id": "task_3rh7l9g"
+    },
+    "task_0iri9g6": {
+      "taskId": "task_0iri9g6",
+      "objective": "Offline Resumption Test",
+      "networkDependency": "online_required",
+      "status": "pending",
+      "createdAt": 1791728585491,
+      "updatedAt": 1791728585493,
+      "resumable": true,
+      "executedStepIds": [],
+      "executionAttempts": 0,
+      "idempotencyToken": "idem_42f2cm0",
+      "plan": {
+        "id": "plan_qusqjqx",
+        "objective": "Offline Resumption Test",
+        "constraints": [
+          "Zero budget ($0.00) enforced",
+          "Truthful reporting only; no fabricated results",
+          "Bounded iteration limit"
+        ],
+        "steps": [
+          {
+            "id": "step_1_inspect",
+            "title": "Inspect Project & Runtime Context",
+            "description": "Check active environment, available tools, and read relevant workspace state.",
+            "dependencies": [],
+            "status": "pending",
+            "assignedTool": "system_status",
+            "toolArgs": {},
+            "verificationCriteria": "Runtime metrics and security perimeter verified.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_2_execute_task",
+            "title": "Execute Core Objective Logic",
+            "description": "Synthesize solution according to user constraints and verifiable evidence.",
+            "dependencies": [
+              "step_1_inspect"
+            ],
+            "status": "pending",
+            "verificationCriteria": "Constraints satisfied with zero unverified assertions.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_final_verify",
+            "title": "Verify Results & Synthesize Truthful Report",
+            "description": "Audit output against non-negotiable zero-budget constraints and check for incomplete work.",
+            "dependencies": [
+              "step_1_inspect",
+              "step_2_execute_task"
+            ],
+            "status": "pending",
+            "verificationCriteria": "All dependencies completed, no fabricated assertions, zero incurred cost.",
+            "repairAttempts": 0
+          }
+        ],
+        "status": "planned",
+        "createdAt": 1791728585491,
+        "updatedAt": 1791728585491,
+        "iterationLimit": 10,
+        "currentIteration": 0
+      },
+      "id": "task_0iri9g6"
+    },
+    "task_uk2iugz": {
+      "taskId": "task_uk2iugz",
+      "objective": "Offline Resumption Test",
+      "networkDependency": "online_required",
+      "status": "pending",
+      "createdAt": 1791728601575,
+      "updatedAt": 1791728601578,
+      "resumable": true,
+      "executedStepIds": [],
+      "executionAttempts": 0,
+      "idempotencyToken": "idem_o1s8m3v",
+      "plan": {
+        "id": "plan_6lw7jax",
+        "objective": "Offline Resumption Test",
+        "constraints": [
+          "Zero budget ($0.00) enforced",
+          "Truthful reporting only; no fabricated results",
+          "Bounded iteration limit"
+        ],
+        "steps": [
+          {
+            "id": "step_1_inspect",
+            "title": "Inspect Project & Runtime Context",
+            "description": "Check active environment, available tools, and read relevant workspace state.",
+            "dependencies": [],
+            "status": "pending",
+            "assignedTool": "system_status",
+            "toolArgs": {},
+            "verificationCriteria": "Runtime metrics and security perimeter verified.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_2_execute_task",
+            "title": "Execute Core Objective Logic",
+            "description": "Synthesize solution according to user constraints and verifiable evidence.",
+            "dependencies": [
+              "step_1_inspect"
+            ],
+            "status": "pending",
+            "verificationCriteria": "Constraints satisfied with zero unverified assertions.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_final_verify",
+            "title": "Verify Results & Synthesize Truthful Report",
+            "description": "Audit output against non-negotiable zero-budget constraints and check for incomplete work.",
+            "dependencies": [
+              "step_1_inspect",
+              "step_2_execute_task"
+            ],
+            "status": "pending",
+            "verificationCriteria": "All dependencies completed, no fabricated assertions, zero incurred cost.",
+            "repairAttempts": 0
+          }
+        ],
+        "status": "planned",
+        "createdAt": 1791728601575,
+        "updatedAt": 1791728601575,
+        "iterationLimit": 10,
+        "currentIteration": 0
+      },
+      "id": "task_uk2iugz"
+    },
+    "task_v8cfbs9": {
+      "taskId": "task_v8cfbs9",
+      "objective": "Offline Resumption Test",
+      "networkDependency": "online_required",
+      "status": "pending",
+      "createdAt": 1791728823621,
+      "updatedAt": 1791728823622,
+      "resumable": true,
+      "executedStepIds": [],
+      "executionAttempts": 0,
+      "idempotencyToken": "idem_kg1ufs6",
+      "plan": {
+        "id": "plan_wj4vghw",
+        "objective": "Offline Resumption Test",
+        "constraints": [
+          "Zero budget ($0.00) enforced",
+          "Truthful reporting only; no fabricated results",
+          "Bounded iteration limit"
+        ],
+        "steps": [
+          {
+            "id": "step_1_inspect",
+            "title": "Inspect Project & Runtime Context",
+            "description": "Check active environment, available tools, and read relevant workspace state.",
+            "dependencies": [],
+            "status": "pending",
+            "assignedTool": "system_status",
+            "toolArgs": {},
+            "verificationCriteria": "Runtime metrics and security perimeter verified.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_2_execute_task",
+            "title": "Execute Core Objective Logic",
+            "description": "Synthesize solution according to user constraints and verifiable evidence.",
+            "dependencies": [
+              "step_1_inspect"
+            ],
+            "status": "pending",
+            "verificationCriteria": "Constraints satisfied with zero unverified assertions.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_final_verify",
+            "title": "Verify Results & Synthesize Truthful Report",
+            "description": "Audit output against non-negotiable zero-budget constraints and check for incomplete work.",
+            "dependencies": [
+              "step_1_inspect",
+              "step_2_execute_task"
+            ],
+            "status": "pending",
+            "verificationCriteria": "All dependencies completed, no fabricated assertions, zero incurred cost.",
+            "repairAttempts": 0
+          }
+        ],
+        "status": "planned",
+        "createdAt": 1791728823621,
+        "updatedAt": 1791728823621,
+        "iterationLimit": 10,
+        "currentIteration": 0
+      },
+      "id": "task_v8cfbs9"
+    },
+    "task_aq0027z": {
+      "taskId": "task_aq0027z",
+      "objective": "Offline Resumption Test",
+      "networkDependency": "online_required",
+      "status": "pending",
+      "createdAt": 1791728883182,
+      "updatedAt": 1791728883185,
+      "resumable": true,
+      "executedStepIds": [],
+      "executionAttempts": 0,
+      "idempotencyToken": "idem_b0fy9xq",
+      "plan": {
+        "id": "plan_wsgocey",
+        "objective": "Offline Resumption Test",
+        "constraints": [
+          "Zero budget ($0.00) enforced",
+          "Truthful reporting only; no fabricated results",
+          "Bounded iteration limit"
+        ],
+        "steps": [
+          {
+            "id": "step_1_inspect",
+            "title": "Inspect Project & Runtime Context",
+            "description": "Check active environment, available tools, and read relevant workspace state.",
+            "dependencies": [],
+            "status": "pending",
+            "assignedTool": "system_status",
+            "toolArgs": {},
+            "verificationCriteria": "Runtime metrics and security perimeter verified.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_2_execute_task",
+            "title": "Execute Core Objective Logic",
+            "description": "Synthesize solution according to user constraints and verifiable evidence.",
+            "dependencies": [
+              "step_1_inspect"
+            ],
+            "status": "pending",
+            "verificationCriteria": "Constraints satisfied with zero unverified assertions.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_final_verify",
+            "title": "Verify Results & Synthesize Truthful Report",
+            "description": "Audit output against non-negotiable zero-budget constraints and check for incomplete work.",
+            "dependencies": [
+              "step_1_inspect",
+              "step_2_execute_task"
+            ],
+            "status": "pending",
+            "verificationCriteria": "All dependencies completed, no fabricated assertions, zero incurred cost.",
+            "repairAttempts": 0
+          }
+        ],
+        "status": "planned",
+        "createdAt": 1791728883182,
+        "updatedAt": 1791728883182,
+        "iterationLimit": 10,
+        "currentIteration": 0
+      },
+      "id": "task_aq0027z"
+    },
+    "task_eqwr2o2": {
+      "taskId": "task_eqwr2o2",
+      "objective": "Offline Resumption Test",
+      "networkDependency": "online_required",
+      "status": "pending",
+      "createdAt": 1791733776216,
+      "updatedAt": 1791733776220,
+      "resumable": true,
+      "executedStepIds": [],
+      "executionAttempts": 0,
+      "idempotencyToken": "idem_taw27fx",
+      "plan": {
+        "id": "plan_k82tnuw",
+        "objective": "Offline Resumption Test",
+        "constraints": [
+          "Zero budget ($0.00) enforced",
+          "Truthful reporting only; no fabricated results",
+          "Bounded iteration limit"
+        ],
+        "steps": [
+          {
+            "id": "step_1_inspect",
+            "title": "Inspect Project & Runtime Context",
+            "description": "Check active environment, available tools, and read relevant workspace state.",
+            "dependencies": [],
+            "status": "pending",
+            "assignedTool": "system_status",
+            "toolArgs": {},
+            "verificationCriteria": "Runtime metrics and security perimeter verified.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_2_execute_task",
+            "title": "Execute Core Objective Logic",
+            "description": "Synthesize solution according to user constraints and verifiable evidence.",
+            "dependencies": [
+              "step_1_inspect"
+            ],
+            "status": "pending",
+            "verificationCriteria": "Constraints satisfied with zero unverified assertions.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_final_verify",
+            "title": "Verify Results & Synthesize Truthful Report",
+            "description": "Audit output against non-negotiable zero-budget constraints and check for incomplete work.",
+            "dependencies": [
+              "step_1_inspect",
+              "step_2_execute_task"
+            ],
+            "status": "pending",
+            "verificationCriteria": "All dependencies completed, no fabricated assertions, zero incurred cost.",
+            "repairAttempts": 0
+          }
+        ],
+        "status": "planned",
+        "createdAt": 1791733776216,
+        "updatedAt": 1791733776216,
+        "iterationLimit": 10,
+        "currentIteration": 0
+      },
+      "id": "task_eqwr2o2"
     }
   },
   "diagnostics": {
@@ -431,6 +781,56 @@
       "checksPerformedCount": 9,
       "findings": [],
       "durationMs": 27
+    },
+    "diag_1xy34h3": {
+      "runId": "diag_1xy34h3",
+      "timestamp": 1791728585450,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 42
+    },
+    "diag_voocv39": {
+      "runId": "diag_voocv39",
+      "timestamp": 1791728601546,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 28
+    },
+    "diag_dxgv68h": {
+      "runId": "diag_dxgv68h",
+      "timestamp": 1791728823596,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 26
+    },
+    "diag_9s49b25": {
+      "runId": "diag_9s49b25",
+      "timestamp": 1791728883141,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 36
+    },
+    "diag_8neh5q5": {
+      "runId": "diag_8neh5q5",
+      "timestamp": 1791733776194,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 25
     }
   },
   "repairs": {
@@ -822,6 +1222,206 @@
         {
           "step": "INDEPENDENT_VERIFY",
           "timestamp": 1791727583336,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
+    },
+    "rep_test_1791728585453": {
+      "repairId": "rep_test_1791728585453",
+      "findingId": "find_harmless_1791728585452",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791728585452",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791728585403,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791728585413,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791728585433,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791728585453,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
+    },
+    "rep_test_1791728601549": {
+      "repairId": "rep_test_1791728601549",
+      "findingId": "find_harmless_1791728601547",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791728601547",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791728601499,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791728601509,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791728601529,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791728601549,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
+    },
+    "rep_test_1791728823599": {
+      "repairId": "rep_test_1791728823599",
+      "findingId": "find_harmless_1791728823597",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791728823597",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791728823549,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791728823559,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791728823579,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791728823599,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
+    },
+    "rep_test_1791728883144": {
+      "repairId": "rep_test_1791728883144",
+      "findingId": "find_harmless_1791728883143",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791728883143",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791728883094,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791728883104,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791728883124,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791728883144,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
+    },
+    "rep_test_1791733776196": {
+      "repairId": "rep_test_1791733776196",
+      "findingId": "find_harmless_1791733776195",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791733776195",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791733776146,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791733776156,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791733776176,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791733776196,
           "status": "passed",
           "details": "Balance check passed"
         }

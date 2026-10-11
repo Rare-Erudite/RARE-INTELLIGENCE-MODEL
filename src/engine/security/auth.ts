@@ -4,6 +4,7 @@
  * Protects privileged developer capabilities, self-repair, and filesystem modifications.
  */
 
+import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../errors/app-error.js';
 import { logger } from './logger.js';
@@ -26,8 +27,8 @@ export class AuthManager {
   private readonly maxRequestsPerWindow = 120; // 120 req/min
 
   private constructor() {
-    this.clientApiKey = process.env.RARE_API_KEY || 'rare_client_sec_token_0budget';
-    this.developerApiKey = process.env.RARE_DEV_KEY || 'rare_dev_sec_token_0budget';
+    this.clientApiKey = process.env.RARE_API_KEY || crypto.randomBytes(24).toString('hex');
+    this.developerApiKey = process.env.RARE_DEV_KEY || crypto.randomBytes(32).toString('hex');
   }
 
   public static getInstance(): AuthManager {

@@ -32,6 +32,8 @@ export type ErrorCode =
   | 'VERIFICATION_FAILED'
   | 'REPAIR_FAILED'
   | 'CIRCUIT_BREAKER_OPEN'
+  | 'NO_AI_PROVIDER_READY'
+  | 'NETWORK_OFFLINE'
   | 'INTERNAL_SERVER_ERROR'
   | 'SERVICE_UNAVAILABLE';
 
@@ -488,6 +490,7 @@ export interface TaskProviderRequirements {
   requiresStreaming?: boolean;
   preferredType?: 'local' | 'online' | 'deterministic' | 'diagnostic';
   taskType?: 'inference' | 'tool_execution' | 'diagnostic';
+  allowDiagnosticFallback?: boolean;
 }
 
 export interface ProviderSelectionDecision {

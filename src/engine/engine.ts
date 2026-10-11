@@ -24,6 +24,7 @@ import { SelfRepairEngine } from './repair/self-repair-engine.js';
 import { ProjectBuildEngine } from './self-build/project-builder.js';
 import { AssistantFoundation } from './assistant/assistant-foundation.js';
 import { CircuitBreaker } from './errors/circuit-breaker.js';
+import { AppError } from './errors/app-error.js';
 import { NetworkTransitionManager, networkManager } from './network/connection-manager.js';
 import { OllamaModelProvider } from './providers/ollama.js';
 import { LocalTransformersProvider } from './providers/transformers-local.js';
@@ -346,9 +347,33 @@ export class RareIntelligenceEngine {
    */
   public async chat(
     messages: ModelMessage[],
-    options?: ModelGenerationConfig
+    options?: ModelGenerationConfig & { allowDiagnosticFallback?: boolean }
   ): Promise<ModelGenerationResult> {
     const activeProvider = this.providers.getActiveProvider();
+    const decision = await this.providers.resolveProviderForTask({
+      preferredType: activeProvider.id === 'gemini' ? 'online' : 'local',
+      allowDiagnosticFallback: options?.allowDiagnosticFallback ?? (activeProvider.id === 'diagnostic-mock'),
+    });
+
+    const targetProvider = this.providers.getProvider(decision.selectedProviderId);
+
+    // Guard: Prevent ordinary chat from silently returning diagnostic mock output
+    if (
+      targetProvider.id === 'diagnostic-mock' &&
+      activeProvider.id !== 'diagnostic-mock' &&
+      !options?.allowDiagnosticFallback
+    ) {
+      const localProvider = this.providers.getProvider('local-transformers') as LocalTransformersProvider;
+      const statusMsg = localProvider.hasCachedWeights()
+        ? `Local open-weight neural model "${localProvider.manifest.name}" weights are present on disk but not loaded into memory. Click "Load Local Model" or call /api/v1/providers/load-local to load weights into memory.`
+        : `Local open-weight neural model "${localProvider.manifest.name}" weights are not installed. Click "Setup Model" in Provider Hub or run model setup to download open weights.`;
+
+      throw new AppError({
+        code: 'NO_AI_PROVIDER_READY',
+        message: `Real neural inference is not ready: ${statusMsg} Ordinary chat will not silently substitute mock answers.`,
+        statusCode: 503,
+      });
+    }
 
     // Context management: slice if exceeding limit
     const maxMessages = this.config.safetyLimits.maxContextMessages;
@@ -360,16 +385,18 @@ export class RareIntelligenceEngine {
       tools: toolDeclarations,
     };
 
-    // If simulating offline or physically offline, verify active provider is local
-    if (!this.networkManager.isOnline() && activeProvider.id === 'gemini') {
-      throw new Error(
-        'Offline Constraint: Active provider "gemini" requires an external network connection, but engine is currently OFFLINE. Switch to local Ollama or diagnostic mock.'
-      );
+    // If simulating offline or physically offline, verify target provider is local
+    if (!this.networkManager.isOnline() && targetProvider.id === 'gemini') {
+      throw new AppError({
+        code: 'NETWORK_OFFLINE',
+        message: 'Active provider "gemini" requires an external network connection, but engine is currently OFFLINE. Switch to local open-weight model or diagnostic mock.',
+        statusCode: 503,
+      });
     }
 
     // Execute through circuit breaker
     return await this.providerCircuitBreaker.execute(async () => {
-      return await activeProvider.generate(boundedMessages, configWithTools);
+      return await targetProvider.generate(boundedMessages, configWithTools);
     });
   }
 

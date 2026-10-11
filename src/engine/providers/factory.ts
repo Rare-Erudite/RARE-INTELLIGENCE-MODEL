@@ -20,19 +20,17 @@ import { logger } from '../security/logger.js';
 
 export class ProviderManager {
   private providers: Map<ModelProviderType, IModelProvider> = new Map();
-  private activeProviderType: ModelProviderType = 'gemini';
+  private activeProviderType: ModelProviderType = 'local-transformers';
 
   constructor() {
-    // Register available zero-cost providers
-    this.registerProvider(new GeminiModelProvider('gemini-3.8-flash'));
-    this.registerProvider(new OllamaModelProvider('llama3.2:1b'));
+    // Register available zero-cost providers with local neural model first
     this.registerProvider(new LocalTransformersProvider());
+    this.registerProvider(new OllamaModelProvider('llama3.2:1b'));
+    this.registerProvider(new GeminiModelProvider('gemini-3.8-flash'));
     this.registerProvider(new DiagnosticMockProvider());
 
-    // Check if Gemini is configured; if not, default to diagnostic mock gracefully
-    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'MY_GEMINI_API_KEY') {
-      this.activeProviderType = 'diagnostic-mock';
-    }
+    // By default, preferred zero-cost provider is local-transformers
+    this.activeProviderType = 'local-transformers';
   }
 
   public registerProvider(provider: IModelProvider) {
@@ -170,7 +168,7 @@ export class ProviderManager {
 
     try {
       const geminiInfo = await gemini.checkAvailability(false);
-      if (geminiInfo.isAvailable) {
+      if (geminiInfo.isAvailable || (geminiInfo.isConfigured && isOnline)) {
         geminiEligible = true;
       } else {
         geminiRejectionReason = geminiInfo.statusMessage;
