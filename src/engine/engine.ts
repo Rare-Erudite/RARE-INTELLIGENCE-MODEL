@@ -26,6 +26,7 @@ import { AssistantFoundation } from './assistant/assistant-foundation.js';
 import { CircuitBreaker } from './errors/circuit-breaker.js';
 import { NetworkTransitionManager, networkManager } from './network/connection-manager.js';
 import { OllamaModelProvider } from './providers/ollama.js';
+import { LocalTransformersProvider } from './providers/transformers-local.js';
 import { LocalModelManager } from './providers/local-runtime.js';
 import {
   EngineConfig,
@@ -190,14 +191,19 @@ export class RareIntelligenceEngine {
       localRuntimeReachable = false;
     }
 
-    // Determine network reachability
-    const isOnline = this.networkManager.isOnline();
+    // Determine network reachability with bounded non-blocking probe (max 600ms)
+    let isOnline = false;
+    try {
+      isOnline = await this.networkManager.probeConnectivity(600);
+    } catch {
+      isOnline = false;
+    }
 
     // Determine operational state
     if (!isOnline) {
       this.operationalState = localModelReady ? 'LOCAL_AI_AVAILABLE' : 'OFFLINE';
     } else {
-      this.operationalState = 'ONLINE';
+      this.operationalState = localModelReady ? 'LOCAL_AI_AVAILABLE' : 'ONLINE';
     }
 
     const localTools = this.tools.getAll().filter((t) => t.permissionLevel !== 'NETWORK_ACCESS');
@@ -266,7 +272,11 @@ export class RareIntelligenceEngine {
     const ollamaProvider = this.providers.getProvider('ollama') as OllamaModelProvider;
     const localRuntimeInfo: LocalRuntimeInfo = await ollamaProvider.getLocalRuntimeInfo();
 
-    const localModelReady = localRuntimeInfo.installedModels.some((m) =>
+    const localTransformersProvider = this.providers.getProvider('local-transformers') as LocalTransformersProvider;
+    const isTransformersReady = localTransformersProvider.isReady;
+    const hasCachedWeights = localTransformersProvider.hasCachedWeights();
+
+    const localModelReady = isTransformersReady || localRuntimeInfo.installedModels.some((m) =>
       m.name.toLowerCase().startsWith(ollamaProvider.modelIdentifier.toLowerCase())
     );
 
@@ -275,7 +285,7 @@ export class RareIntelligenceEngine {
     if (!isOnline) {
       state = localModelReady ? 'LOCAL_AI_AVAILABLE' : 'OFFLINE';
     } else if (activeInfo?.isAvailable) {
-      state = active.id === 'ollama' ? 'LOCAL_AI_AVAILABLE' : 'ONLINE_AI_AVAILABLE';
+      state = (active.id === 'ollama' || active.id === 'local-transformers') ? 'LOCAL_AI_AVAILABLE' : 'ONLINE_AI_AVAILABLE';
     } else {
       state = localModelReady ? 'LOCAL_AI_AVAILABLE' : 'NO_AI_PROVIDER_AVAILABLE';
     }
@@ -297,8 +307,8 @@ export class RareIntelligenceEngine {
         'Syntax Integrity & Code Analysis',
         'Self-Diagnostics & Self-Repair Engine',
         localModelReady
-          ? `Local Model Inference (${ollamaProvider.modelIdentifier})`
-          : 'Diagnostic Sandbox Mock Inference',
+          ? `Local Model Inference (${isTransformersReady ? localTransformersProvider.modelIdentifier : ollamaProvider.modelIdentifier})`
+          : (hasCachedWeights ? 'Local Model Verified on Disk (Qwen2.5-0.5B ONNX Q4, 786MB)' : 'Diagnostic Sandbox Mock Inference'),
       ],
       networkDependentCapabilities: [
         'Google Gemini Remote Inference',

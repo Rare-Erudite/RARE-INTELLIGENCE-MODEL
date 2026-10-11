@@ -5,7 +5,7 @@
 
 export type ExecutionEnvironment = 'free-cloud' | 'local-runtime' | 'diagnostic-sandbox';
 
-export type ModelProviderType = 'gemini' | 'ollama' | 'diagnostic-mock';
+export type ModelProviderType = 'gemini' | 'ollama' | 'local-transformers' | 'diagnostic-mock';
 
 export type ToolPermissionLevel = 'READ_ONLY' | 'WORKSPACE_WRITE' | 'SYSTEM_COMMAND' | 'NETWORK_ACCESS';
 
@@ -343,12 +343,23 @@ export interface ResearchFinding {
   summary: string;
 }
 
+export interface DocumentChunk {
+  chunkIndex: number;
+  content: string;
+  charStart: number;
+  charEnd: number;
+  estimatedTokens: number;
+}
+
 export interface ExtractedDocumentData {
   filename: string;
-  format: 'text' | 'markdown' | 'json' | 'csv';
+  format: 'text' | 'markdown' | 'json' | 'csv' | 'pdf' | 'docx' | 'unknown';
   lineCount: number;
   summary: string;
   tables?: Array<{ headers: string[]; rows: string[][] }>;
+  chunks?: DocumentChunk[];
+  isScannedOrEncrypted?: boolean;
+  requiresOcr?: boolean;
   metadata: Record<string, any>;
 }
 

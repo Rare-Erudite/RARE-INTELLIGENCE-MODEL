@@ -6,10 +6,10 @@
 
 import { logger } from '../security/logger.js';
 
-export type ConnectivityState = 'ONLINE' | 'OFFLINE' | 'SIMULATED_OFFLINE';
+export type ConnectivityState = 'UNKNOWN' | 'ONLINE' | 'OFFLINE' | 'SIMULATED_OFFLINE';
 
 export class NetworkTransitionManager {
-  private currentState: ConnectivityState = 'ONLINE';
+  private currentState: ConnectivityState = 'UNKNOWN';
   private simulatedOffline = false;
   private lastCheckTime = 0;
   private listeners: Array<(state: ConnectivityState) => void> = new Array();
@@ -19,7 +19,7 @@ export class NetworkTransitionManager {
   }
 
   private async checkInitialState() {
-    // Non-blocking initial check
+    // Non-blocking initial timestamp; does not assume ONLINE without evidence
     this.lastCheckTime = Date.now();
   }
 
@@ -31,6 +31,14 @@ export class NetworkTransitionManager {
   public getState(): ConnectivityState {
     if (this.simulatedOffline) return 'SIMULATED_OFFLINE';
     return this.currentState;
+  }
+
+  public setExplicitState(state: ConnectivityState): void {
+    if (this.currentState !== state) {
+      this.currentState = state;
+      logger.info('NetworkTransitionManager', `Connection state explicitly transitioned to: ${state}`);
+      this.notifyListeners(this.simulatedOffline ? 'SIMULATED_OFFLINE' : state);
+    }
   }
 
   public setSimulatedOffline(enabled: boolean): void {

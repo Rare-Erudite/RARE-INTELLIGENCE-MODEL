@@ -15,6 +15,8 @@ import { AppError } from './src/engine/errors/app-error.js';
 import { logger } from './src/engine/security/logger.js';
 import { DeviceHardwareEvaluator } from './src/engine/providers/device-evaluator.js';
 import { LocalModelManager } from './src/engine/providers/local-runtime.js';
+import { authManager } from './src/engine/security/auth.js';
+import { defaultSecurityGuard } from './src/engine/security/permissions.js';
 
 dotenv.config();
 
@@ -25,6 +27,27 @@ const app = express();
 const port = parseInt(process.env.PORT || '3000', 10);
 
 app.use(express.json({ limit: '2mb' }));
+
+// Request Timeout Middleware (35s maximum execution bound)
+app.use((req, res, next) => {
+  res.setTimeout(35000, () => {
+    logger.warn('Server', `Request timed out for ${req.method} ${req.path}`);
+    if (!res.headersSent) {
+      res.status(504).json({
+        success: false,
+        error: {
+          code: 'TIMEOUT_OR_CANCELLED',
+          message: 'Request execution timed out after 35 seconds.',
+          correlationId: (req as any).correlationId || 'req_timeout',
+          statusCode: 504,
+          timestamp: Date.now(),
+          isTransient: true,
+        },
+      });
+    }
+  });
+  next();
+});
 
 // Correlation ID & Request Tracking Middleware
 app.use((req, res, next) => {
@@ -47,9 +70,22 @@ app.use((req, res, next) => {
 
 const apiRouter = express.Router();
 
+// Apply global authentication resolution and rate limiting across API endpoints
+apiRouter.use(authManager.authenticateMiddleware());
+apiRouter.use(authManager.rateLimitMiddleware(120));
+
 /**
- * 1. Health & Engine Telemetry
+ * 1. Health & Engine Telemetry (Public)
  */
+apiRouter.get('/health', async (_req, res, next) => {
+  try {
+    const health = await engine.getHealth();
+    res.json({ success: true, health });
+  } catch (err) {
+    next(err);
+  }
+});
+
 apiRouter.get('/engine/health', async (_req, res, next) => {
   try {
     const health = await engine.getHealth();
@@ -81,7 +117,7 @@ apiRouter.get('/engine/status', async (_req, res, next) => {
 /**
  * 2. Model Providers
  */
-apiRouter.get('/providers', async (_req, res, next) => {
+apiRouter.get('/providers', authManager.requireRole(['client', 'developer']), async (_req, res, next) => {
   try {
     const providers = await engine.providers.getAvailableProvidersInfo();
     const active = engine.providers.getActiveProvider();
@@ -94,7 +130,7 @@ apiRouter.get('/providers', async (_req, res, next) => {
   }
 });
 
-apiRouter.post('/providers/switch', (req, res, next) => {
+apiRouter.post('/providers/switch', authManager.requireRole(['developer']), (req, res, next) => {
   try {
     const { providerId } = req.body;
     if (!providerId) {
@@ -115,7 +151,7 @@ apiRouter.post('/providers/switch', (req, res, next) => {
   }
 });
 
-apiRouter.post('/providers/test', async (req, res, next) => {
+apiRouter.post('/providers/test', authManager.requireRole(['developer']), async (req, res, next) => {
   try {
     const { providerId } = req.body;
     const provider = providerId ? engine.providers.getProvider(providerId) : engine.providers.getActiveProvider();
@@ -126,21 +162,109 @@ apiRouter.post('/providers/test', async (req, res, next) => {
   }
 });
 
+apiRouter.post('/providers/load-local', authManager.requireRole(['client', 'developer']), async (_req, res, next) => {
+  try {
+    const localProvider = engine.providers.getProvider('local-transformers') as any;
+    if (!localProvider) {
+      throw new AppError({
+        code: 'NOT_FOUND',
+        message: 'Local transformers provider not registered in engine.',
+        statusCode: 404,
+      });
+    }
+
+    const loaded = await localProvider.loadModel();
+    // Automatically switch active provider to local-transformers if successful
+    engine.providers.setActiveProvider('local-transformers');
+
+    res.json({
+      success: true,
+      loaded,
+      manifest: localProvider.manifest,
+      activeProvider: 'local-transformers',
+      message: `Local open-weight model "${localProvider.manifest.name}" successfully loaded into memory and active for neural inference.`,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /**
  * 3. Chat & Conversational Context
  */
-apiRouter.post('/chat', async (req, res, next) => {
+apiRouter.post('/chat', authManager.requireRole(['client', 'developer']), async (req, res, next) => {
   try {
-    const { messages, options } = req.body;
-    if (!messages || !Array.isArray(messages)) {
+    const { messages, options, conversationId, message } = req.body;
+
+    // A. Conversation-linked chat execution
+    if (conversationId) {
+      let conv = engine.getConversation(conversationId);
+      if (!conv) {
+        conv = {
+          id: conversationId,
+          title: message ? String(message).substring(0, 30) + (String(message).length > 30 ? '...' : '') : 'New Conversation',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          messages: [],
+          metadata: {},
+        };
+      }
+
+      const userText = message || (Array.isArray(messages) && messages[messages.length - 1]?.content) || '';
+      if (!String(userText).trim()) {
+        throw new AppError({
+          code: 'VALIDATION_FAILED',
+          message: 'Message content is required.',
+          statusCode: 400,
+        });
+      }
+
+      conv.messages.push({
+        role: 'user',
+        content: String(userText).trim(),
+        timestamp: Date.now(),
+      });
+
+      const result = await engine.chat(conv.messages, options);
+
+      conv.messages.push({
+        role: 'model',
+        content: result.text,
+        timestamp: Date.now(),
+        metadata: {
+          provider: result.provider,
+          model: result.model,
+          latencyMs: result.latencyMs,
+          isSimulated: result.isSimulated,
+        },
+      });
+
+      conv.updatedAt = Date.now();
+      engine.saveConversation(conv);
+
+      return res.json({
+        success: true,
+        conversationId: conv.id,
+        conversation: conv,
+        result,
+      });
+    }
+
+    // B. Direct messages array or single message
+    let payloadMessages = messages;
+    if (!payloadMessages && message) {
+      payloadMessages = [{ role: 'user', content: String(message).trim() }];
+    }
+
+    if (!payloadMessages || !Array.isArray(payloadMessages) || payloadMessages.length === 0) {
       throw new AppError({
         code: 'VALIDATION_FAILED',
-        message: 'Request body must include "messages" array.',
+        message: 'Request body must include "messages" array or "message" string.',
         statusCode: 400,
       });
     }
 
-    const result = await engine.chat(messages, options);
+    const result = await engine.chat(payloadMessages, options);
     res.json({ success: true, result });
   } catch (err) {
     next(err);
@@ -150,7 +274,7 @@ apiRouter.post('/chat', async (req, res, next) => {
 /**
  * 4. Task Planning & Autonomous Execution
  */
-apiRouter.post('/tasks/plan', (req, res, next) => {
+apiRouter.post('/tasks/plan', authManager.requireRole(['client', 'developer']), (req, res, next) => {
   try {
     const { objective, constraints } = req.body;
     if (!objective) {
@@ -167,7 +291,7 @@ apiRouter.post('/tasks/plan', (req, res, next) => {
   }
 });
 
-apiRouter.post('/tasks/execute', async (req, res, next) => {
+apiRouter.post('/tasks/execute', authManager.requireRole(['client', 'developer']), async (req, res, next) => {
   try {
     const { objective, constraints, context } = req.body;
     if (!objective) {
@@ -192,7 +316,7 @@ apiRouter.post('/tasks/execute', async (req, res, next) => {
 /**
  * 5. Registered Tools Catalog & Execution Sandbox
  */
-apiRouter.get('/tools', (_req, res) => {
+apiRouter.get('/tools', authManager.requireRole(['client', 'developer']), (_req, res) => {
   const tools = engine.tools.getAll().map((t) => ({
     name: t.name,
     description: t.description,
@@ -202,7 +326,7 @@ apiRouter.get('/tools', (_req, res) => {
   res.json({ tools });
 });
 
-apiRouter.post('/tools/execute', async (req, res, next) => {
+apiRouter.post('/tools/execute', authManager.requireRole(['developer']), async (req, res, next) => {
   try {
     const { name, args, dryRun } = req.body;
     if (!name) {
@@ -231,7 +355,7 @@ apiRouter.post('/tools/execute', async (req, res, next) => {
 /**
  * 6. Durable Multi-Collection Storage
  */
-apiRouter.get('/memory', async (req, res, next) => {
+apiRouter.get('/memory', authManager.requireRole(['client', 'developer']), async (req, res, next) => {
   try {
     const category = req.query.category as any;
     const items = await engine.memory.list(category);
@@ -246,7 +370,7 @@ apiRouter.get('/memory', async (req, res, next) => {
   }
 });
 
-apiRouter.post('/memory', async (req, res, next) => {
+apiRouter.post('/memory', authManager.requireRole(['client', 'developer']), async (req, res, next) => {
   try {
     const { key, content, category, tags, source } = req.body;
     if (!key || !content) {
@@ -269,7 +393,7 @@ apiRouter.post('/memory', async (req, res, next) => {
   }
 });
 
-apiRouter.delete('/memory/:key', async (req, res, next) => {
+apiRouter.delete('/memory/:key', authManager.requireRole(['client', 'developer']), async (req, res, next) => {
   try {
     const success = await engine.memory.delete(req.params.key);
     res.json({ success });
@@ -278,16 +402,16 @@ apiRouter.delete('/memory/:key', async (req, res, next) => {
   }
 });
 
-apiRouter.get('/storage/stats', (_req, res) => {
+apiRouter.get('/storage/stats', authManager.requireRole(['client', 'developer']), (_req, res) => {
   res.json({ stats: engine.durableStore.getStats() });
 });
 
-apiRouter.post('/storage/backup', (_req, res) => {
+apiRouter.post('/storage/backup', authManager.requireRole(['developer']), (_req, res) => {
   const backupPath = engine.durableStore.createBackup();
   res.json({ success: !!backupPath, backupPath });
 });
 
-apiRouter.post('/storage/verify-restart', async (_req, res, next) => {
+apiRouter.post('/storage/verify-restart', authManager.requireRole(['developer']), async (_req, res, next) => {
   try {
     const result = await engine.durableStore.verifyRestartDurability();
     res.json({ success: true, result });
@@ -297,9 +421,9 @@ apiRouter.post('/storage/verify-restart', async (_req, res, next) => {
 });
 
 /**
- * 7. Self-Diagnostics Subsystem
+ * 7. Self-Diagnostics Subsystem (Developer Privileged)
  */
-apiRouter.get('/diagnostics/run', async (_req, res, next) => {
+apiRouter.get('/diagnostics/run', authManager.requireRole(['developer']), async (_req, res, next) => {
   try {
     const report = await engine.runDiagnostics();
     res.json({ success: true, report });
@@ -308,15 +432,15 @@ apiRouter.get('/diagnostics/run', async (_req, res, next) => {
   }
 });
 
-apiRouter.get('/diagnostics/reports', (_req, res) => {
+apiRouter.get('/diagnostics/reports', authManager.requireRole(['developer']), (_req, res) => {
   const reports = engine.durableStore.getDiagnosticReports(20);
   res.json({ reports });
 });
 
 /**
- * 8. Autonomous Self-Repair Subsystem
+ * 8. Autonomous Self-Repair Subsystem (Developer Privileged)
  */
-apiRouter.post('/repair/run', async (req, res, next) => {
+apiRouter.post('/repair/run', authManager.requireRole(['developer']), async (req, res, next) => {
   try {
     const { findingId } = req.body;
     const outcomes = await engine.runAutonomousRepair(findingId);
@@ -326,12 +450,12 @@ apiRouter.post('/repair/run', async (req, res, next) => {
   }
 });
 
-apiRouter.get('/repair/history', (_req, res) => {
+apiRouter.get('/repair/history', authManager.requireRole(['developer']), (_req, res) => {
   const history = engine.durableStore.getRepairResults(20);
   res.json({ history });
 });
 
-apiRouter.post('/repair/test-harmless-fault', async (_req, res, next) => {
+apiRouter.post('/repair/test-harmless-fault', authManager.requireRole(['developer']), async (_req, res, next) => {
   try {
     const testOutcome = await engine.repair.testHarmlessFaultSelfRepair();
     res.json({ success: true, testOutcome });
@@ -341,9 +465,9 @@ apiRouter.post('/repair/test-harmless-fault', async (_req, res, next) => {
 });
 
 /**
- * 9. Safe Self-Build & Checkpoints
+ * 9. Safe Self-Build & Checkpoints (Developer Privileged)
  */
-apiRouter.post('/build/execute', async (req, res, next) => {
+apiRouter.post('/build/execute', authManager.requireRole(['developer']), async (req, res, next) => {
   try {
     const { goal, targetFiles, fileChanges } = req.body;
     if (!goal || !targetFiles || !fileChanges) {
@@ -369,12 +493,12 @@ apiRouter.post('/build/execute', async (req, res, next) => {
   }
 });
 
-apiRouter.get('/build/checkpoints', (_req, res) => {
+apiRouter.get('/build/checkpoints', authManager.requireRole(['developer']), (_req, res) => {
   const checkpoints = engine.durableStore.listCheckpoints();
   res.json({ checkpoints });
 });
 
-apiRouter.post('/build/checkpoints/:id/restore', (req, res, next) => {
+apiRouter.post('/build/checkpoints/:id/restore', authManager.requireRole(['developer']), (req, res, next) => {
   try {
     const success = engine.selfBuild.restoreCheckpoint(req.params.id);
     if (!success) {
@@ -393,7 +517,7 @@ apiRouter.post('/build/checkpoints/:id/restore', (req, res, next) => {
 /**
  * 10. Future Assistant Foundation (RARE-THE-SIXTH)
  */
-apiRouter.post('/assistant/token-budget', (req, res, next) => {
+apiRouter.post('/assistant/token-budget', authManager.requireRole(['client', 'developer']), (req, res, next) => {
   try {
     const { messages, maxLimit } = req.body;
     if (!messages || !Array.isArray(messages)) {
@@ -410,7 +534,7 @@ apiRouter.post('/assistant/token-budget', (req, res, next) => {
   }
 });
 
-apiRouter.post('/assistant/research', (req, res, next) => {
+apiRouter.post('/assistant/research', authManager.requireRole(['client', 'developer']), (req, res, next) => {
   try {
     const { topic, notes } = req.body;
     if (!topic) {
@@ -427,7 +551,7 @@ apiRouter.post('/assistant/research', (req, res, next) => {
   }
 });
 
-apiRouter.post('/assistant/document-parse', (req, res, next) => {
+apiRouter.post('/assistant/document-parse', authManager.requireRole(['client', 'developer']), (req, res, next) => {
   try {
     const { filename, content } = req.body;
     if (!filename || !content) {
@@ -444,7 +568,7 @@ apiRouter.post('/assistant/document-parse', (req, res, next) => {
   }
 });
 
-apiRouter.post('/assistant/safe-url-read', async (req, res, next) => {
+apiRouter.post('/assistant/safe-url-read', authManager.requireRole(['client', 'developer']), async (req, res, next) => {
   try {
     const { url } = req.body;
     if (!url) {
@@ -461,18 +585,18 @@ apiRouter.post('/assistant/safe-url-read', async (req, res, next) => {
   }
 });
 
-apiRouter.get('/assistant/multimodal-capabilities', (_req, res) => {
+apiRouter.get('/assistant/multimodal-capabilities', authManager.requireRole(['client', 'developer']), (_req, res) => {
   res.json({ capabilities: engine.assistant.getMultimodalCapabilities() });
 });
 
 /**
  * 11. Circuit Breaker Controls
  */
-apiRouter.get('/circuit-breaker/stats', (_req, res) => {
+apiRouter.get('/circuit-breaker/stats', authManager.requireRole(['client', 'developer']), (_req, res) => {
   res.json({ stats: engine.providerCircuitBreaker.getStats() });
 });
 
-apiRouter.post('/circuit-breaker/reset', (_req, res) => {
+apiRouter.post('/circuit-breaker/reset', authManager.requireRole(['developer']), (_req, res) => {
   engine.providerCircuitBreaker.reset();
   res.json({ success: true, message: 'Provider circuit breaker reset to CLOSED.' });
 });
@@ -480,7 +604,7 @@ apiRouter.post('/circuit-breaker/reset', (_req, res) => {
 /**
  * 12. Network & Offline State Management
  */
-apiRouter.get('/network/status', (_req, res) => {
+apiRouter.get('/network/status', authManager.requireRole(['client', 'developer']), (_req, res) => {
   res.json({
     isOnline: engine.networkManager.isOnline(),
     state: engine.networkManager.getState(),
@@ -488,7 +612,7 @@ apiRouter.get('/network/status', (_req, res) => {
   });
 });
 
-apiRouter.post('/network/simulate-offline', (req, res) => {
+apiRouter.post('/network/simulate-offline', authManager.requireRole(['developer']), (req, res) => {
   const { enabled } = req.body;
   engine.networkManager.setSimulatedOffline(!!enabled);
   res.json({
@@ -498,7 +622,7 @@ apiRouter.post('/network/simulate-offline', (req, res) => {
   });
 });
 
-apiRouter.post('/network/probe', async (_req, res, next) => {
+apiRouter.post('/network/probe', authManager.requireRole(['developer']), async (_req, res, next) => {
   try {
     const isOnline = await engine.networkManager.probeConnectivity();
     res.json({ success: true, isOnline });
@@ -510,7 +634,7 @@ apiRouter.post('/network/probe', async (_req, res, next) => {
 /**
  * 13. Local Runtime, Hardware & Model Management
  */
-apiRouter.get('/runtime/local', async (_req, res, next) => {
+apiRouter.get('/runtime/local', authManager.requireRole(['client', 'developer']), async (_req, res, next) => {
   try {
     const ollama = engine.providers.getProvider('ollama') as any;
     const runtimeInfo = await ollama.getLocalRuntimeInfo();
@@ -520,7 +644,7 @@ apiRouter.get('/runtime/local', async (_req, res, next) => {
   }
 });
 
-apiRouter.get('/runtime/hardware', (_req, res) => {
+apiRouter.get('/runtime/hardware', authManager.requireRole(['client', 'developer']), (_req, res) => {
   res.json({
     success: true,
     hardware: DeviceHardwareEvaluator.inspectHostResources(),
@@ -529,7 +653,7 @@ apiRouter.get('/runtime/hardware', (_req, res) => {
   });
 });
 
-apiRouter.post('/runtime/hardware/profile', (req, res) => {
+apiRouter.post('/runtime/hardware/profile', authManager.requireRole(['developer']), (req, res) => {
   const { profile } = req.body;
   DeviceHardwareEvaluator.setTargetProfileOverride(profile || null);
   res.json({
@@ -539,7 +663,7 @@ apiRouter.post('/runtime/hardware/profile', (req, res) => {
   });
 });
 
-apiRouter.get('/runtime/models/catalog', (_req, res) => {
+apiRouter.get('/runtime/models/catalog', authManager.requireRole(['client', 'developer']), (_req, res) => {
   res.json({
     success: true,
     catalog: DeviceHardwareEvaluator.getKnownModelCatalog(),
@@ -547,7 +671,7 @@ apiRouter.get('/runtime/models/catalog', (_req, res) => {
   });
 });
 
-apiRouter.get('/runtime/models/installed', async (_req, res, next) => {
+apiRouter.get('/runtime/models/installed', authManager.requireRole(['client', 'developer']), async (_req, res, next) => {
   try {
     const installed = await engine.localModelManager.getInstalledModels();
     res.json({ success: true, installed });
@@ -556,14 +680,14 @@ apiRouter.get('/runtime/models/installed', async (_req, res, next) => {
   }
 });
 
-apiRouter.get('/runtime/models/setup/status', (_req, res) => {
+apiRouter.get('/runtime/models/setup/status', authManager.requireRole(['client', 'developer']), (_req, res) => {
   res.json({
     success: true,
     setupProgress: engine.localModelManager.getActiveSetupProgress(),
   });
 });
 
-apiRouter.post('/runtime/models/setup', async (req, res, next) => {
+apiRouter.post('/runtime/models/setup', authManager.requireRole(['developer']), async (req, res, next) => {
   try {
     const { modelName } = req.body;
     if (!modelName) {
@@ -580,12 +704,12 @@ apiRouter.post('/runtime/models/setup', async (req, res, next) => {
   }
 });
 
-apiRouter.post('/runtime/models/setup/cancel', (_req, res) => {
+apiRouter.post('/runtime/models/setup/cancel', authManager.requireRole(['developer']), (_req, res) => {
   const cancelled = engine.localModelManager.cancelModelSetup();
   res.json({ success: true, cancelled });
 });
 
-apiRouter.post('/providers/resolve', async (req, res, next) => {
+apiRouter.post('/providers/resolve', authManager.requireRole(['developer']), async (req, res, next) => {
   try {
     const decision = await engine.providers.resolveProviderForTask(req.body);
     res.json({ success: true, decision });
@@ -597,14 +721,14 @@ apiRouter.post('/providers/resolve', async (req, res, next) => {
 /**
  * 13.5. Durable Conversations Persistence
  */
-apiRouter.get('/conversations', (_req, res) => {
+apiRouter.get('/conversations', authManager.requireRole(['client', 'developer']), (_req, res) => {
   res.json({
     success: true,
     conversations: engine.listConversations(),
   });
 });
 
-apiRouter.get('/conversations/:id', (req, res, next) => {
+apiRouter.get('/conversations/:id', authManager.requireRole(['client', 'developer']), (req, res, next) => {
   try {
     const conversation = engine.getConversation(req.params.id);
     if (!conversation) {
@@ -620,11 +744,12 @@ apiRouter.get('/conversations/:id', (req, res, next) => {
   }
 });
 
-apiRouter.post('/conversations', (req, res, next) => {
+apiRouter.post('/conversations', authManager.requireRole(['client', 'developer']), (req, res, next) => {
   try {
-    const { id, title, messages, metadata } = req.body;
+    const { id, title, messages, metadata } = req.body || {};
+    const generatedId = id || 'conv_' + Math.random().toString(36).substring(2, 9);
     const session = {
-      id: id || 'conv_' + Math.random().toString(36).substring(2, 9),
+      id: generatedId,
       title: title || 'New Conversation',
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -632,13 +757,118 @@ apiRouter.post('/conversations', (req, res, next) => {
       metadata: metadata || {},
     };
     engine.saveConversation(session);
-    res.json({ success: true, session });
+    res.json({
+      success: true,
+      id: session.id,
+      conversationId: session.id,
+      session,
+      conversation: session,
+    });
   } catch (err) {
     next(err);
   }
 });
 
-apiRouter.delete('/conversations/:id', (req, res) => {
+apiRouter.patch('/conversations/:id', authManager.requireRole(['client', 'developer']), (req, res, next) => {
+  try {
+    const conversation = engine.getConversation(req.params.id);
+    if (!conversation) {
+      throw new AppError({
+        code: 'NOT_FOUND',
+        message: `Conversation session "${req.params.id}" not found.`,
+        statusCode: 404,
+      });
+    }
+    const { title, metadata } = req.body || {};
+    if (title !== undefined) conversation.title = String(title).trim();
+    if (metadata !== undefined) conversation.metadata = { ...conversation.metadata, ...metadata };
+    conversation.updatedAt = Date.now();
+    engine.saveConversation(conversation);
+    res.json({ success: true, conversation, session: conversation });
+  } catch (err) {
+    next(err);
+  }
+});
+
+apiRouter.get('/conversations/:id/messages', authManager.requireRole(['client', 'developer']), (req, res, next) => {
+  try {
+    const conversation = engine.getConversation(req.params.id);
+    if (!conversation) {
+      throw new AppError({
+        code: 'NOT_FOUND',
+        message: `Conversation session "${req.params.id}" not found.`,
+        statusCode: 404,
+      });
+    }
+    res.json({ success: true, messages: conversation.messages });
+  } catch (err) {
+    next(err);
+  }
+});
+
+apiRouter.post('/conversations/:id/messages', authManager.requireRole(['client', 'developer']), async (req, res, next) => {
+  try {
+    const conversationId = req.params.id;
+    let conv = engine.getConversation(conversationId);
+    if (!conv) {
+      conv = {
+        id: conversationId,
+        title: req.body?.message ? String(req.body.message).substring(0, 30) : 'New Conversation',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        messages: [],
+        metadata: {},
+      };
+    }
+
+    const { message, content, options } = req.body || {};
+    const userText = message || content;
+    if (!userText || !String(userText).trim()) {
+      throw new AppError({
+        code: 'VALIDATION_FAILED',
+        message: 'Message content is required ("message" or "content").',
+        statusCode: 400,
+      });
+    }
+
+    const userMessage = {
+      role: 'user' as const,
+      content: String(userText).trim(),
+      timestamp: Date.now(),
+    };
+    conv.messages.push(userMessage);
+
+    const result = await engine.chat(conv.messages, options);
+
+    const modelMessage = {
+      role: 'model' as const,
+      content: result.text,
+      timestamp: Date.now(),
+      metadata: {
+        provider: result.provider,
+        model: result.model,
+        latencyMs: result.latencyMs,
+        isSimulated: result.isSimulated,
+      },
+    };
+    conv.messages.push(modelMessage);
+    conv.updatedAt = Date.now();
+    engine.saveConversation(conv);
+
+    res.json({
+      success: true,
+      conversationId: conv.id,
+      session: conv,
+      conversation: conv,
+      message: modelMessage,
+      result,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+apiRouter.delete('/conversations/:id', authManager.requireRole(['client', 'developer']), (req, res) => {
   const deleted = engine.deleteConversation(req.params.id);
   res.json({ success: true, deleted });
 });
@@ -646,7 +876,7 @@ apiRouter.delete('/conversations/:id', (req, res) => {
 /**
  * 14. Persistent Offline Task Queue
  */
-apiRouter.post('/queue/enqueue', (req, res, next) => {
+apiRouter.post('/queue/enqueue', authManager.requireRole(['client', 'developer']), (req, res, next) => {
   try {
     const { objective, networkDependency, constraints } = req.body;
     if (!objective) {
@@ -663,14 +893,14 @@ apiRouter.post('/queue/enqueue', (req, res, next) => {
   }
 });
 
-apiRouter.get('/queue/tasks', (_req, res) => {
+apiRouter.get('/queue/tasks', authManager.requireRole(['client', 'developer']), (_req, res) => {
   res.json({
     stats: engine.taskQueue.getQueueStats(),
     tasks: engine.taskQueue.listTasks(),
   });
 });
 
-apiRouter.post('/queue/tasks/:id/execute', async (req, res, next) => {
+apiRouter.post('/queue/tasks/:id/execute', authManager.requireRole(['client', 'developer']), async (req, res, next) => {
   try {
     const task = await engine.taskQueue.executeTaskById(
       req.params.id,
@@ -682,7 +912,7 @@ apiRouter.post('/queue/tasks/:id/execute', async (req, res, next) => {
   }
 });
 
-apiRouter.post('/queue/tasks/:id/pause', (req, res, next) => {
+apiRouter.post('/queue/tasks/:id/pause', authManager.requireRole(['client', 'developer']), (req, res, next) => {
   try {
     const task = engine.taskQueue.pauseTask(req.params.id, req.body.reason || 'Paused by operator');
     res.json({ success: true, task });
@@ -692,13 +922,13 @@ apiRouter.post('/queue/tasks/:id/pause', (req, res, next) => {
 });
 
 /**
- * 12. Benchmarks & Continuous Improvement
+ * 15. Benchmarks & Continuous Improvement
  */
-apiRouter.get('/benchmarks', (_req, res) => {
+apiRouter.get('/benchmarks', authManager.requireRole(['client', 'developer']), (_req, res) => {
   res.json({ tasks: STANDARD_BENCHMARK_TASKS });
 });
 
-apiRouter.post('/benchmarks/run', async (_req, res, next) => {
+apiRouter.post('/benchmarks/run', authManager.requireRole(['developer']), async (_req, res, next) => {
   try {
     const active = engine.providers.getActiveProvider();
     const suiteResult = await engine.benchmarks.runFullSuite(active);
@@ -709,16 +939,16 @@ apiRouter.post('/benchmarks/run', async (_req, res, next) => {
 });
 
 /**
- * 13. Upgrade Registry & Rollback
+ * 16. Upgrade Registry & Rollback
  */
-apiRouter.get('/upgrades', (_req, res) => {
+apiRouter.get('/upgrades', authManager.requireRole(['client', 'developer']), (_req, res) => {
   res.json({
     activeCandidate: engine.upgrades.getActiveCandidate(),
     candidates: engine.upgrades.getCandidates(),
   });
 });
 
-apiRouter.post('/upgrades/adopt', (req, res, next) => {
+apiRouter.post('/upgrades/adopt', authManager.requireRole(['developer']), (req, res, next) => {
   try {
     const { version, approvedBy } = req.body;
     const adopted = engine.upgrades.adoptUpgrade(version, approvedBy || 'Manual Operator');
@@ -728,7 +958,7 @@ apiRouter.post('/upgrades/adopt', (req, res, next) => {
   }
 });
 
-apiRouter.post('/upgrades/rollback', (req, res, next) => {
+apiRouter.post('/upgrades/rollback', authManager.requireRole(['developer']), (req, res, next) => {
   try {
     const { reason } = req.body;
     const previous = engine.upgrades.rollback(reason || 'Operator requested rollback');
@@ -739,9 +969,9 @@ apiRouter.post('/upgrades/rollback', (req, res, next) => {
 });
 
 /**
- * 14. Automated Quality Gate Test Runner
+ * 17. Automated Quality Gate Test Runner (Developer Privileged)
  */
-apiRouter.post('/tests/run', async (_req, res, next) => {
+apiRouter.post('/tests/run', authManager.requireRole(['developer']), async (_req, res, next) => {
   try {
     const summary = await EngineTestSuiteRunner.runAllTests();
     res.json({ success: true, summary });
@@ -751,9 +981,9 @@ apiRouter.post('/tests/run', async (_req, res, next) => {
 });
 
 /**
- * 15. System Diagnostics Logs
+ * 18. System Diagnostics Logs (Developer Privileged)
  */
-apiRouter.get('/diagnostics/logs', (_req, res) => {
+apiRouter.get('/diagnostics/logs', authManager.requireRole(['developer']), (_req, res) => {
   res.json({ logs: logger.getRecentLogs(100) });
 });
 
@@ -769,7 +999,8 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
   const isAppError = err instanceof AppError;
   const statusCode = isAppError ? err.statusCode : 500;
   const code = isAppError ? err.code : 'INTERNAL_SERVER_ERROR';
-  const safeMessage = isAppError ? err.message : 'An internal engine error occurred.';
+  const rawMessage = isAppError ? err.message : 'An internal engine error occurred.';
+  const safeMessage = defaultSecurityGuard.sanitizeSecrets(rawMessage);
 
   logger.error('HttpErrorHandler', `[${correlationId}] ${code} (${statusCode}): ${err.message}`);
 

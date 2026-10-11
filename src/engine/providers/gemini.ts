@@ -55,7 +55,8 @@ export class GeminiModelProvider implements IModelProvider {
 
   private cachedInfo: ModelProviderInfo | null = null;
   private lastProbeTime = 0;
-  private readonly cacheTTL = 300_000; // 5 minutes cache
+  private lastProbeSucceeded = false;
+  private readonly cacheTTL = 60_000; // 1 minute cache
 
   public async checkAvailability(forceLiveProbe = false): Promise<ModelProviderInfo> {
     // Refresh env in case it was injected
@@ -63,6 +64,7 @@ export class GeminiModelProvider implements IModelProvider {
 
     // 1. If not configured, report missing key
     if (!this.apiKeyPresent || !this.client) {
+      this.lastProbeSucceeded = false;
       return {
         id: this.id,
         name: this.name,
@@ -107,8 +109,28 @@ export class GeminiModelProvider implements IModelProvider {
       return this.cachedInfo;
     }
 
-    // Fast verification when online and API key is verified present
-    if (!forceLiveProbe) {
+    // Fast status check without live probe: reports configured, but distinguishes live verification status
+    if (!forceLiveProbe && !this.lastProbeSucceeded) {
+      const info: ModelProviderInfo = {
+        id: this.id,
+        name: this.name,
+        modelIdentifier: this.modelIdentifier,
+        isAvailable: false, // Truthful: configured credentials present, pending live verification
+        isConfigured: true,
+        supportsFunctionCalling: true,
+        supportsStreaming: true,
+        license: 'Google AI Terms of Service (Free Tier)',
+        freeTierStatus: {
+          isFree: true,
+          quotaNotes: `Configured for ${this.modelIdentifier}. Zero-budget free tier enforced.`,
+          rateLimitNotes: 'Credentials present. Live request probe not yet verified.',
+        },
+        statusMessage: `Configured with GEMINI_API_KEY for model "${this.modelIdentifier}". Run live probe to verify provider quota and connectivity.`,
+      };
+      this.cachedInfo = info;
+      this.lastProbeTime = now;
+      return info;
+    } else if (!forceLiveProbe && this.lastProbeSucceeded) {
       const info: ModelProviderInfo = {
         id: this.id,
         name: this.name,
@@ -120,10 +142,10 @@ export class GeminiModelProvider implements IModelProvider {
         license: 'Google AI Terms of Service (Free Tier)',
         freeTierStatus: {
           isFree: true,
-          quotaNotes: 'Gemini 3.8 Flash Free Tier active and configured.',
-          rateLimitNotes: 'Standard 15 RPM / 1M TPM free tier allowance.',
+          quotaNotes: `Model ${this.modelIdentifier} verified live.`,
+          rateLimitNotes: 'Active zero-cost session.',
         },
-        statusMessage: 'Operational. GEMINI_API_KEY verified and ready for inference.',
+        statusMessage: `Operational: live inference verified with ${this.modelIdentifier}.`,
       };
       this.cachedInfo = info;
       this.lastProbeTime = now;
@@ -140,7 +162,7 @@ export class GeminiModelProvider implements IModelProvider {
       });
 
       const probePromise = this.client.models.generateContent({
-        model: 'gemini-3.1-flash-lite',
+        model: this.modelIdentifier,
         contents: 'ping',
         config: {
           maxOutputTokens: 5,
@@ -151,6 +173,7 @@ export class GeminiModelProvider implements IModelProvider {
       clearTimeout(timer);
       const latency = Date.now() - start;
 
+      this.lastProbeSucceeded = true;
       const info: ModelProviderInfo = {
         id: this.id,
         name: this.name,
@@ -165,17 +188,34 @@ export class GeminiModelProvider implements IModelProvider {
           quotaNotes: 'Verified live connection. Gemini Free Tier active.',
           rateLimitNotes: `Live latency: ${latency}ms`,
         },
-        statusMessage: `Operational (verified live in ${latency}ms)`,
+        statusMessage: `Operational (verified live in ${latency}ms with ${this.modelIdentifier})`,
       };
       this.cachedInfo = info;
       this.lastProbeTime = Date.now();
       return info;
     } catch (err: any) {
+      this.lastProbeSucceeded = false;
       logger.info('GeminiProvider', 'Live probe report', { error: err.message });
       const isQuota = err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED');
+      const isDemandSpike = err.message?.includes('503') || err.message?.includes('UNAVAILABLE') || err.message?.includes('high demand');
+      const isRetired = err.message?.includes('404') || err.message?.includes('NOT_FOUND') || err.message?.includes('no longer available');
+      const isAuthError = err.message?.includes('401') || err.message?.includes('403') || err.message?.includes('API_KEY_INVALID');
       const isTimeout = err.message?.includes('timed out');
 
-      return {
+      let statusMessage = `External provider probe error: ${err.message}`;
+      if (isDemandSpike) {
+        statusMessage = `Model ${this.modelIdentifier} is temporarily experiencing high demand (HTTP 503). Zero-budget policy forbids paid fallbacks.`;
+      } else if (isQuota) {
+        statusMessage = `Quota exhausted on Gemini free tier (HTTP 429). Blocked until quota reset; paid auto-upgrades are strictly disabled.`;
+      } else if (isRetired) {
+        statusMessage = `Model ${this.modelIdentifier} is retired or not found on provider API.`;
+      } else if (isAuthError) {
+        statusMessage = `Invalid or unauthorized GEMINI_API_KEY credentials.`;
+      } else if (isTimeout) {
+        statusMessage = `Live probe timed out (connection slow or unreachable).`;
+      }
+
+      const info: ModelProviderInfo = {
         id: this.id,
         name: this.name,
         modelIdentifier: this.modelIdentifier,
@@ -186,15 +226,14 @@ export class GeminiModelProvider implements IModelProvider {
         license: 'Google AI Terms of Service',
         freeTierStatus: {
           isFree: true,
-          quotaNotes: isQuota ? 'Free-tier quota limit reached (HTTP 429).' : 'API configured.',
-          rateLimitNotes: isTimeout ? 'Live probe timed out (connection slow or unreachable)' : err.message,
+          quotaNotes: isQuota ? 'Free-tier quota limit reached (HTTP 429).' : isDemandSpike ? 'Temporary service spike (HTTP 503).' : 'API configured.',
+          rateLimitNotes: isTimeout ? 'Live probe timed out' : err.message,
         },
-        statusMessage: isQuota
-          ? 'Quota exhausted on free tier. Please wait for reset or switch to local/diagnostic provider.'
-          : isTimeout
-          ? 'Live probe timed out. Provider is configured but currently unreachable.'
-          : `External provider probe error: ${err.message}`,
+        statusMessage,
       };
+      this.cachedInfo = info;
+      this.lastProbeTime = Date.now();
+      return info;
     }
   }
 

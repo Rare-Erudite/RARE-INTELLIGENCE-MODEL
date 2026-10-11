@@ -4,5 +4,6 @@ dist/
 coverage/
 .DS_Store
 *.log
+data/models_cache/
 .env*
 !.env.example

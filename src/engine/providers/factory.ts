@@ -8,6 +8,7 @@ import { IModelProvider } from './base.js';
 import { GeminiModelProvider } from './gemini.js';
 import { OllamaModelProvider } from './ollama.js';
 import { DiagnosticMockProvider } from './diagnostic.js';
+import { LocalTransformersProvider } from './transformers-local.js';
 import {
   ModelProviderInfo,
   ModelProviderType,
@@ -25,6 +26,7 @@ export class ProviderManager {
     // Register available zero-cost providers
     this.registerProvider(new GeminiModelProvider('gemini-3.8-flash'));
     this.registerProvider(new OllamaModelProvider('llama3.2:1b'));
+    this.registerProvider(new LocalTransformersProvider());
     this.registerProvider(new DiagnosticMockProvider());
 
     // Check if Gemini is configured; if not, default to diagnostic mock gracefully
@@ -82,7 +84,26 @@ export class ProviderManager {
       };
     }
 
-    // 2. Evaluate Ollama / Local Model
+    // 2. Evaluate Local Neural Providers (In-Process Transformers & Ollama Daemon)
+    const localTransformers = this.getProvider('local-transformers') as LocalTransformersProvider;
+    let localTransformersEligible = false;
+    let localTransformersRejection: string | undefined;
+    try {
+      const ltInfo = await localTransformers.checkAvailability();
+      if (ltInfo.isAvailable) {
+        localTransformersEligible = true;
+      } else {
+        localTransformersRejection = ltInfo.statusMessage;
+      }
+    } catch (err: any) {
+      localTransformersRejection = err.message;
+    }
+    evaluated.push({
+      id: 'local-transformers',
+      eligible: localTransformersEligible,
+      rejectionReason: localTransformersRejection,
+    });
+
     const ollama = this.getProvider('ollama') as OllamaModelProvider;
     let ollamaEligible = false;
     let ollamaRejectionReason: string | undefined;
@@ -106,6 +127,18 @@ export class ProviderManager {
 
     // If offline, local execution is mandatory
     if (!isOnline) {
+      if (localTransformersEligible) {
+        return {
+          selectedProviderId: 'local-transformers',
+          providerName: localTransformers.name,
+          reason: 'Network is offline. In-process local neural model (Qwen2.5-0.5B ONNX) is loaded in memory for genuine offline inference.',
+          isLocal: true,
+          isOnline: false,
+          isSimulated: false,
+          candidatesEvaluated: evaluated,
+        };
+      }
+
       if (ollamaEligible) {
         return {
           selectedProviderId: 'ollama',
@@ -122,7 +155,7 @@ export class ProviderManager {
       return {
         selectedProviderId: 'diagnostic-mock',
         providerName: 'RARE Diagnostic Sandbox (Deterministic Mock)',
-        reason: 'Network is offline and no local open-weight model daemon is currently active. Falling back safely to in-process deterministic diagnostics.',
+        reason: 'Network is offline and no local open-weight model is active in memory. Falling back safely to deterministic offline sandbox (deterministic mock, NOT genuine AI inference).',
         isLocal: true,
         isOnline: false,
         isSimulated: true,
@@ -153,16 +186,29 @@ export class ProviderManager {
     });
 
     // If local was preferred and eligible, prefer it
-    if (requirements.preferredType === 'local' && ollamaEligible) {
-      return {
-        selectedProviderId: 'ollama',
-        providerName: ollama.name,
-        reason: 'Local execution preferred by caller; local runtime verified ready.',
-        isLocal: true,
-        isOnline: false,
-        isSimulated: false,
-        candidatesEvaluated: evaluated,
-      };
+    if (requirements.preferredType === 'local') {
+      if (localTransformersEligible) {
+        return {
+          selectedProviderId: 'local-transformers',
+          providerName: localTransformers.name,
+          reason: 'Local execution preferred; in-process neural model verified ready in memory.',
+          isLocal: true,
+          isOnline: false,
+          isSimulated: false,
+          candidatesEvaluated: evaluated,
+        };
+      }
+      if (ollamaEligible) {
+        return {
+          selectedProviderId: 'ollama',
+          providerName: ollama.name,
+          reason: 'Local execution preferred by caller; local runtime verified ready.',
+          isLocal: true,
+          isOnline: false,
+          isSimulated: false,
+          candidatesEvaluated: evaluated,
+        };
+      }
     }
 
     // Online execution with Gemini

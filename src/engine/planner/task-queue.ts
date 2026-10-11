@@ -179,16 +179,25 @@ export class PersistentTaskQueue {
   public resumeEligibleTasks(): void {
     const paused = this.listTasks().filter((t) => t.status === 'paused_waiting_network' && t.resumable);
     logger.info('PersistentTaskQueue', `Found ${paused.length} paused tasks eligible for resumption.`);
-    // Marks eligible tasks back to pending for worker pick-up
+    // Marks eligible tasks back to pending for worker pick-up while preserving executed steps
     for (const t of paused) {
       t.status = 'pending';
       t.error = undefined;
       t.updatedAt = Date.now();
+      if (t.plan?.steps) {
+        for (const step of t.plan.steps) {
+          if ((step.status as string) === 'paused_waiting_network') {
+            step.status = 'pending';
+            step.error = undefined;
+          }
+        }
+      }
       this.saveQueuedTask(t);
     }
   }
 
   private saveQueuedTask(task: PersistentQueuedTask): void {
+    (task as any).id = task.taskId;
     this.memoryStore.saveTask((task as any) as TaskPlan);
   }
 }

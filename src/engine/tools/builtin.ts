@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import { ExecutionContext, ToolDefinition, ToolExecutionResult } from '../types.js';
 import { defaultSecurityGuard } from '../security/permissions.js';
+import { SafeMathEvaluator } from './math-evaluator.js';
 
 /**
  * 1. file_read: Read contents of a workspace file within sandbox.
@@ -353,39 +354,7 @@ export const calculatorEvalTool: ToolDefinition = {
     const start = Date.now();
     try {
       const expr = (args.expression || '').trim();
-      // Only allow digits, operators, math functions, whitespace, and parens
-      if (!/^[0-9+\-*/^%().,\s\w]+$/.test(expr)) {
-        return {
-          success: false,
-          output: null,
-          error: 'Unsafe characters detected in mathematical expression.',
-          durationMs: Date.now() - start,
-          permissionUsed: 'READ_ONLY',
-          auditRecord: { timestamp: start, sanitizedArgs: args },
-        };
-      }
-
-      // Safe evaluation parser
-      const cleanExpr = expr
-        .replace(/\bsqrt\b/g, 'Math.sqrt')
-        .replace(/\babs\b/g, 'Math.abs')
-        .replace(/\bround\b/g, 'Math.round')
-        .replace(/\bmin\b/g, 'Math.min')
-        .replace(/\bmax\b/g, 'Math.max')
-        .replace(/\^/g, '**');
-
-      // Verify only safe Math calls
-      if (cleanExpr.includes('import') || cleanExpr.includes('process') || cleanExpr.includes('require')) {
-        throw new Error('Forbidden token in math expression');
-      }
-
-      // Evaluate within restricted Function scope with no globals
-      const safeMathFn = new Function('Math', `"use strict"; return (${cleanExpr});`);
-      const result = safeMathFn(Math);
-
-      if (typeof result !== 'number' || isNaN(result)) {
-        throw new Error('Calculation did not yield a valid finite number');
-      }
+      const result = SafeMathEvaluator.evaluate(expr);
 
       return {
         success: true,

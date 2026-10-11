@@ -115,6 +115,7 @@ export class AssistantFoundation {
         lineCount: lines.length,
         summary: `CSV spreadsheet containing ${rows.length} rows and ${headers.length} columns: [${headers.join(', ')}]`,
         tables: [{ headers, rows }],
+        chunks: this.chunkDocument(content),
         metadata: { rowCount: rows.length, columnCount: headers.length },
       };
     }
@@ -128,6 +129,7 @@ export class AssistantFoundation {
           format: 'json',
           lineCount: lines.length,
           summary: `JSON document containing ${keys.length} top-level keys: [${keys.slice(0, 10).join(', ')}]`,
+          chunks: this.chunkDocument(content),
           metadata: { keysCount: keys.length, isArray: Array.isArray(obj) },
         };
       } catch (err: any) {
@@ -141,14 +143,173 @@ export class AssistantFoundation {
       }
     }
 
+    // PDF extraction heuristics
+    if (ext === 'pdf' || content.startsWith('%PDF-')) {
+      const isPdfHeader = content.includes('%PDF-');
+      // Search for text operators in PDF stream: (text) Tj or [(text)] TJ
+      const textMatches: string[] = [];
+      const tjRegex = /\(([^)]+)\)\s*Tj/g;
+      let match;
+      while ((match = tjRegex.exec(content)) !== null) {
+        if (match[1] && match[1].trim().length > 0) {
+          textMatches.push(match[1]);
+        }
+      }
+
+      const extractedText = textMatches.join(' ').trim();
+      const isScanned = extractedText.length < 20;
+
+      return {
+        filename,
+        format: 'pdf',
+        lineCount: lines.length,
+        summary: isScanned
+          ? `PDF document detected (${lines.length} objects). Pure text extraction found 0 text objects. Scanned image layers require OCR.`
+          : `PDF document successfully parsed with ${textMatches.length} text fragments extracted.`,
+        isScannedOrEncrypted: isScanned,
+        requiresOcr: isScanned,
+        chunks: extractedText.length > 0 ? this.chunkDocument(extractedText) : [],
+        metadata: {
+          isPdfHeader,
+          extractedChars: extractedText.length,
+          scannedDetected: isScanned,
+        },
+      };
+    }
+
+    // DOCX extraction heuristics
+    if (ext === 'docx') {
+      // DOCX contains XML with <w:t> tags
+      const wtMatches: string[] = [];
+      const wtRegex = /<w:t[^>]*>([^<]+)<\/w:t>/g;
+      let match;
+      while ((match = wtRegex.exec(content)) !== null) {
+        if (match[1]) wtMatches.push(match[1]);
+      }
+
+      const extractedText = wtMatches.join(' ').trim();
+      return {
+        filename,
+        format: 'docx',
+        lineCount: lines.length,
+        summary: `Word DOCX document parsed with ${wtMatches.length} text elements extracted.`,
+        chunks: extractedText.length > 0 ? this.chunkDocument(extractedText) : [],
+        metadata: { paragraphCount: wtMatches.length, extractedChars: extractedText.length },
+      };
+    }
+
     // Markdown or Plain Text
     const headings = lines.filter((l) => l.startsWith('#')).map((l) => l.trim());
+
+    // Extract Markdown tables if present (| col | col |)
+    const tableRows = lines.filter((l) => l.trim().startsWith('|') && l.trim().endsWith('|'));
+    let tables: Array<{ headers: string[]; rows: string[][] }> | undefined;
+    if (tableRows.length >= 2) {
+      const parsedRows = tableRows
+        .filter((r) => !r.includes('---')) // Filter separator row
+        .map((r) =>
+          r
+            .split('|')
+            .map((c) => c.trim())
+            .filter((c, idx, arr) => idx > 0 && idx < arr.length - 1)
+        );
+      if (parsedRows.length >= 1) {
+        tables = [{ headers: parsedRows[0], rows: parsedRows.slice(1) }];
+      }
+    }
+
     return {
       filename,
       format: ext === 'md' ? 'markdown' : 'text',
       lineCount: lines.length,
       summary: `${ext.toUpperCase()} document with ${lines.length} lines${headings.length > 0 ? ` and ${headings.length} headings` : ''}.`,
+      tables,
+      chunks: this.chunkDocument(content),
       metadata: { headingsCount: headings.length, byteSize: Buffer.byteLength(content, 'utf-8') },
+    };
+  }
+
+  /**
+   * Bounded chunking for long documents with overlap
+   */
+  public chunkDocument(content: string, chunkSize = 1200, overlap = 150): Array<{
+    chunkIndex: number;
+    content: string;
+    charStart: number;
+    charEnd: number;
+    estimatedTokens: number;
+  }> {
+    if (!content || content.length === 0) return [];
+
+    const chunks = [];
+    let start = 0;
+    let index = 0;
+
+    while (start < content.length) {
+      const end = Math.min(content.length, start + chunkSize);
+      const chunkText = content.substring(start, end);
+
+      chunks.push({
+        chunkIndex: index++,
+        content: chunkText,
+        charStart: start,
+        charEnd: end,
+        estimatedTokens: Math.ceil(chunkText.length / 4),
+      });
+
+      if (end >= content.length) break;
+      start += chunkSize - overlap;
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Retrieval over document chunks for question answering
+   */
+  public queryDocument(
+    query: string,
+    doc: ExtractedDocumentData
+  ): { answer: string; relevantChunks: any[]; confidence: 'high' | 'medium' | 'low' } {
+    if (!doc.chunks || doc.chunks.length === 0) {
+      return {
+        answer: `Document "${doc.filename}" contains no searchable text chunks.`,
+        relevantChunks: [],
+        confidence: 'low',
+      };
+    }
+
+    const queryKeywords = query
+      .toLowerCase()
+      .split(/\W+/)
+      .filter((w) => w.length > 2);
+
+    const scoredChunks = doc.chunks.map((chunk) => {
+      const lower = chunk.content.toLowerCase();
+      let score = 0;
+      for (const kw of queryKeywords) {
+        if (lower.includes(kw)) score += 1;
+      }
+      return { ...chunk, score };
+    });
+
+    scoredChunks.sort((a, b) => b.score - a.score);
+    const topChunks = scoredChunks.filter((c) => c.score > 0).slice(0, 3);
+
+    if (topChunks.length === 0) {
+      return {
+        answer: `No relevant content found in "${doc.filename}" matching the query.`,
+        relevantChunks: [],
+        confidence: 'low',
+      };
+    }
+
+    const bestChunk = topChunks[0];
+    const confidence = bestChunk.score >= 3 ? 'high' : bestChunk.score >= 1 ? 'medium' : 'low';
+    return {
+      answer: `Found in ${doc.filename} (Chunk #${bestChunk.chunkIndex}): "${bestChunk.content.substring(0, 250)}..."`,
+      relevantChunks: topChunks,
+      confidence,
     };
   }
 

@@ -1,0 +1,845 @@
+{
+  "metadata": {
+    "schemaVersion": 2,
+    "engineVersion": "1.0.0-rc1",
+    "checksum": "13b20c2013ffdcd323874f55d9bbc6242200d84f239d2f973a85df7a9d00521b",
+    "updatedAt": 1791728585397,
+    "lastBackupAt": 1791727583301,
+    "filesystemDurability": "ephemeral_sandbox",
+    "itemCounts": {
+      "memories": 4,
+      "conversations": 0,
+      "tasks": 4,
+      "diagnostics": 10,
+      "repairs": 10,
+      "checkpoints": 0,
+      "auditEvents": 0
+    }
+  },
+  "memories": {
+    "engine_core_directive": {
+      "key": "engine_core_directive",
+      "content": "RARE-INTELLIGENCE powers RARE-THE-SIXTH. Zero-budget policy enforced. Bounded execution loops only. Truthful reporting required.",
+      "category": "project_fact",
+      "tags": [
+        "directive",
+        "architecture",
+        "budget"
+      ],
+      "source": "engine_checkpoint",
+      "id": "seed_o342p1n",
+      "createdAt": 1791717084268,
+      "updatedAt": 1791717084268,
+      "isPersistent": true
+    },
+    "continuous_improvement_protocol": {
+      "key": "continuous_improvement_protocol",
+      "content": "Capabilities must be benchmarked across reasoning, coding, math, and research before adopting version upgrades. Maintain rollbacks.",
+      "category": "project_fact",
+      "tags": [
+        "upgrade",
+        "benchmarking",
+        "safeguards"
+      ],
+      "source": "engine_checkpoint",
+      "id": "seed_tj1eb3d",
+      "createdAt": 1791717084268,
+      "updatedAt": 1791717084268,
+      "isPersistent": true
+    },
+    "user_budget_constraint": {
+      "key": "user_budget_constraint",
+      "content": "Zero budget for subscriptions, paid APIs, paid databases, or paid model licenses. Internet data only permitted expense.",
+      "category": "preference",
+      "tags": [
+        "budget",
+        "free-tier",
+        "policy"
+      ],
+      "source": "user_input",
+      "id": "seed_ly8wi98",
+      "createdAt": 1791717084268,
+      "updatedAt": 1791717084268,
+      "isPersistent": true
+    },
+    "persistent_unit_test": {
+      "key": "persistent_unit_test",
+      "content": "verifiable data payload",
+      "category": "project_fact",
+      "tags": [
+        "test",
+        "persistent"
+      ],
+      "source": "engine_checkpoint",
+      "id": "mem_z718pp1",
+      "createdAt": 1791717084274,
+      "updatedAt": 1791717658634,
+      "isPersistent": true
+    }
+  },
+  "conversations": {},
+  "tasks": {
+    "undefined": {
+      "taskId": "task_0nipygg",
+      "objective": "Offline Resumption Test",
+      "networkDependency": "online_required",
+      "status": "pending",
+      "createdAt": 1791726302428,
+      "updatedAt": 1791726302428,
+      "resumable": true,
+      "executedStepIds": [],
+      "executionAttempts": 0,
+      "idempotencyToken": "idem_6d1eum3",
+      "plan": {
+        "id": "plan_dmajae8",
+        "objective": "Offline Resumption Test",
+        "constraints": [
+          "Zero budget ($0.00) enforced",
+          "Truthful reporting only; no fabricated results",
+          "Bounded iteration limit"
+        ],
+        "steps": [
+          {
+            "id": "step_1_inspect",
+            "title": "Inspect Project & Runtime Context",
+            "description": "Check active environment, available tools, and read relevant workspace state.",
+            "dependencies": [],
+            "status": "pending",
+            "assignedTool": "system_status",
+            "toolArgs": {},
+            "verificationCriteria": "Runtime metrics and security perimeter verified.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_2_execute_task",
+            "title": "Execute Core Objective Logic",
+            "description": "Synthesize solution according to user constraints and verifiable evidence.",
+            "dependencies": [
+              "step_1_inspect"
+            ],
+            "status": "pending",
+            "verificationCriteria": "Constraints satisfied with zero unverified assertions.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_final_verify",
+            "title": "Verify Results & Synthesize Truthful Report",
+            "description": "Audit output against non-negotiable zero-budget constraints and check for incomplete work.",
+            "dependencies": [
+              "step_1_inspect",
+              "step_2_execute_task"
+            ],
+            "status": "pending",
+            "verificationCriteria": "All dependencies completed, no fabricated assertions, zero incurred cost.",
+            "repairAttempts": 0
+          }
+        ],
+        "status": "planned",
+        "createdAt": 1791726302428,
+        "updatedAt": 1791726302428,
+        "iterationLimit": 10,
+        "currentIteration": 0
+      }
+    },
+    "task_fl197hw": {
+      "taskId": "task_fl197hw",
+      "objective": "Offline Resumption Test",
+      "networkDependency": "online_required",
+      "status": "pending",
+      "createdAt": 1791726361390,
+      "updatedAt": 1791726361392,
+      "resumable": true,
+      "executedStepIds": [],
+      "executionAttempts": 0,
+      "idempotencyToken": "idem_du6irnv",
+      "plan": {
+        "id": "plan_v1rx6ss",
+        "objective": "Offline Resumption Test",
+        "constraints": [
+          "Zero budget ($0.00) enforced",
+          "Truthful reporting only; no fabricated results",
+          "Bounded iteration limit"
+        ],
+        "steps": [
+          {
+            "id": "step_1_inspect",
+            "title": "Inspect Project & Runtime Context",
+            "description": "Check active environment, available tools, and read relevant workspace state.",
+            "dependencies": [],
+            "status": "pending",
+            "assignedTool": "system_status",
+            "toolArgs": {},
+            "verificationCriteria": "Runtime metrics and security perimeter verified.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_2_execute_task",
+            "title": "Execute Core Objective Logic",
+            "description": "Synthesize solution according to user constraints and verifiable evidence.",
+            "dependencies": [
+              "step_1_inspect"
+            ],
+            "status": "pending",
+            "verificationCriteria": "Constraints satisfied with zero unverified assertions.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_final_verify",
+            "title": "Verify Results & Synthesize Truthful Report",
+            "description": "Audit output against non-negotiable zero-budget constraints and check for incomplete work.",
+            "dependencies": [
+              "step_1_inspect",
+              "step_2_execute_task"
+            ],
+            "status": "pending",
+            "verificationCriteria": "All dependencies completed, no fabricated assertions, zero incurred cost.",
+            "repairAttempts": 0
+          }
+        ],
+        "status": "planned",
+        "createdAt": 1791726361390,
+        "updatedAt": 1791726361390,
+        "iterationLimit": 10,
+        "currentIteration": 0
+      },
+      "id": "task_fl197hw"
+    },
+    "task_jjes3gz": {
+      "taskId": "task_jjes3gz",
+      "objective": "Offline Resumption Test",
+      "networkDependency": "online_required",
+      "status": "pending",
+      "createdAt": 1791727426232,
+      "updatedAt": 1791727426234,
+      "resumable": true,
+      "executedStepIds": [],
+      "executionAttempts": 0,
+      "idempotencyToken": "idem_23s2l9t",
+      "plan": {
+        "id": "plan_mfgqjvw",
+        "objective": "Offline Resumption Test",
+        "constraints": [
+          "Zero budget ($0.00) enforced",
+          "Truthful reporting only; no fabricated results",
+          "Bounded iteration limit"
+        ],
+        "steps": [
+          {
+            "id": "step_1_inspect",
+            "title": "Inspect Project & Runtime Context",
+            "description": "Check active environment, available tools, and read relevant workspace state.",
+            "dependencies": [],
+            "status": "pending",
+            "assignedTool": "system_status",
+            "toolArgs": {},
+            "verificationCriteria": "Runtime metrics and security perimeter verified.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_2_execute_task",
+            "title": "Execute Core Objective Logic",
+            "description": "Synthesize solution according to user constraints and verifiable evidence.",
+            "dependencies": [
+              "step_1_inspect"
+            ],
+            "status": "pending",
+            "verificationCriteria": "Constraints satisfied with zero unverified assertions.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_final_verify",
+            "title": "Verify Results & Synthesize Truthful Report",
+            "description": "Audit output against non-negotiable zero-budget constraints and check for incomplete work.",
+            "dependencies": [
+              "step_1_inspect",
+              "step_2_execute_task"
+            ],
+            "status": "pending",
+            "verificationCriteria": "All dependencies completed, no fabricated assertions, zero incurred cost.",
+            "repairAttempts": 0
+          }
+        ],
+        "status": "planned",
+        "createdAt": 1791727426232,
+        "updatedAt": 1791727426232,
+        "iterationLimit": 10,
+        "currentIteration": 0
+      },
+      "id": "task_jjes3gz"
+    },
+    "task_3rh7l9g": {
+      "taskId": "task_3rh7l9g",
+      "objective": "Offline Resumption Test",
+      "networkDependency": "online_required",
+      "status": "pending",
+      "createdAt": 1791727583355,
+      "updatedAt": 1791727583357,
+      "resumable": true,
+      "executedStepIds": [],
+      "executionAttempts": 0,
+      "idempotencyToken": "idem_e0h39an",
+      "plan": {
+        "id": "plan_8mvlakc",
+        "objective": "Offline Resumption Test",
+        "constraints": [
+          "Zero budget ($0.00) enforced",
+          "Truthful reporting only; no fabricated results",
+          "Bounded iteration limit"
+        ],
+        "steps": [
+          {
+            "id": "step_1_inspect",
+            "title": "Inspect Project & Runtime Context",
+            "description": "Check active environment, available tools, and read relevant workspace state.",
+            "dependencies": [],
+            "status": "pending",
+            "assignedTool": "system_status",
+            "toolArgs": {},
+            "verificationCriteria": "Runtime metrics and security perimeter verified.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_2_execute_task",
+            "title": "Execute Core Objective Logic",
+            "description": "Synthesize solution according to user constraints and verifiable evidence.",
+            "dependencies": [
+              "step_1_inspect"
+            ],
+            "status": "pending",
+            "verificationCriteria": "Constraints satisfied with zero unverified assertions.",
+            "repairAttempts": 0
+          },
+          {
+            "id": "step_final_verify",
+            "title": "Verify Results & Synthesize Truthful Report",
+            "description": "Audit output against non-negotiable zero-budget constraints and check for incomplete work.",
+            "dependencies": [
+              "step_1_inspect",
+              "step_2_execute_task"
+            ],
+            "status": "pending",
+            "verificationCriteria": "All dependencies completed, no fabricated assertions, zero incurred cost.",
+            "repairAttempts": 0
+          }
+        ],
+        "status": "planned",
+        "createdAt": 1791727583355,
+        "updatedAt": 1791727583355,
+        "iterationLimit": 10,
+        "currentIteration": 0
+      },
+      "id": "task_3rh7l9g"
+    }
+  },
+  "diagnostics": {
+    "diag_c04b3va": {
+      "runId": "diag_c04b3va",
+      "timestamp": 1791718780871,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 71
+    },
+    "diag_s1qfn8s": {
+      "runId": "diag_s1qfn8s",
+      "timestamp": 1791718909563,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 15
+    },
+    "diag_x9jwdjg": {
+      "runId": "diag_x9jwdjg",
+      "timestamp": 1791718931367,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 2
+    },
+    "diag_vxlu23c": {
+      "runId": "diag_vxlu23c",
+      "timestamp": 1791718972536,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 73
+    },
+    "diag_589onal": {
+      "runId": "diag_589onal",
+      "timestamp": 1791719386025,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 32
+    },
+    "diag_8gznw4q": {
+      "runId": "diag_8gznw4q",
+      "timestamp": 1791725726727,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 12
+    },
+    "diag_5idvsab": {
+      "runId": "diag_5idvsab",
+      "timestamp": 1791726302407,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 32
+    },
+    "diag_bhhb0ma": {
+      "runId": "diag_bhhb0ma",
+      "timestamp": 1791726361370,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 30
+    },
+    "diag_j08jhz1": {
+      "runId": "diag_j08jhz1",
+      "timestamp": 1791727426208,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 35
+    },
+    "diag_tojrrdt": {
+      "runId": "diag_tojrrdt",
+      "timestamp": 1791727583333,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 27
+    }
+  },
+  "repairs": {
+    "rep_test_1791718780874": {
+      "repairId": "rep_test_1791718780874",
+      "findingId": "find_harmless_1791718780872",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791718780872",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791718780824,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791718780834,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791718780854,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791718780874,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
+    },
+    "rep_test_1791718913522": {
+      "repairId": "rep_test_1791718913522",
+      "findingId": "find_harmless_1791718913521",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791718913521",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791718913472,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791718913482,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791718913502,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791718913522,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
+    },
+    "rep_test_1791718931369": {
+      "repairId": "rep_test_1791718931369",
+      "findingId": "find_harmless_1791718931368",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791718931368",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791718931319,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791718931329,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791718931349,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791718931369,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
+    },
+    "rep_test_1791718972538": {
+      "repairId": "rep_test_1791718972538",
+      "findingId": "find_harmless_1791718972537",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791718972537",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791718972488,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791718972498,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791718972518,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791718972538,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
+    },
+    "rep_test_1791719386027": {
+      "repairId": "rep_test_1791719386027",
+      "findingId": "find_harmless_1791719386026",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791719386026",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791719385977,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791719385987,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791719386007,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791719386027,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
+    },
+    "rep_test_1791725726729": {
+      "repairId": "rep_test_1791725726729",
+      "findingId": "find_harmless_1791725726728",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791725726728",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791725726679,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791725726689,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791725726709,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791725726729,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
+    },
+    "rep_test_1791726302410": {
+      "repairId": "rep_test_1791726302410",
+      "findingId": "find_harmless_1791726302409",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791726302409",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791726302360,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791726302370,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791726302390,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791726302410,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
+    },
+    "rep_test_1791726361372": {
+      "repairId": "rep_test_1791726361372",
+      "findingId": "find_harmless_1791726361371",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791726361371",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791726361322,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791726361332,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791726361352,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791726361372,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
+    },
+    "rep_test_1791727426212": {
+      "repairId": "rep_test_1791727426212",
+      "findingId": "find_harmless_1791727426210",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791727426210",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791727426162,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791727426172,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791727426192,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791727426212,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
+    },
+    "rep_test_1791727583336": {
+      "repairId": "rep_test_1791727583336",
+      "findingId": "find_harmless_1791727583334",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791727583334",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791727583286,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791727583296,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791727583316,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791727583336,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
+    }
+  },
+  "checkpoints": {},
+  "providerConfig": {
+    "preferredProvider": "gemini",
+    "localModel": "llama3.2:1b",
+    "autoResumeTasks": true
+  },
+  "auditEvents": []
+}

@@ -411,9 +411,12 @@ export class FilePersistentStore implements IMemoryStore {
   // ==========================================
   // Multi-Collection Methods
   // ==========================================
-  public saveTask(plan: TaskPlan): void {
-    this.payload.tasks[plan.id] = plan;
-    this.flushToDisk();
+  public saveTask(planOrTask: any): void {
+    const id = planOrTask.id || planOrTask.taskId;
+    if (id) {
+      this.payload.tasks[id] = planOrTask;
+      this.flushToDisk();
+    }
   }
 
   public getTask(id: string): TaskPlan | null {
