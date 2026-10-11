@@ -1,0 +1,6 @@
+{
+  "name": "RARE-INTELLIGENCE Engine",
+  "description": "Modular, production-oriented autonomous AI intelligence engine with continuous capability evaluation, provider abstraction, tool orchestration, and memory persistence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
