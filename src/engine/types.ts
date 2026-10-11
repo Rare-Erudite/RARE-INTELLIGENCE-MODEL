@@ -5,7 +5,12 @@
 
 export type ExecutionEnvironment = 'free-cloud' | 'local-runtime' | 'diagnostic-sandbox';
 
-export type ModelProviderType = 'gemini' | 'ollama' | 'local-transformers' | 'diagnostic-mock';
+export type ModelProviderType =
+  | 'gemini'
+  | 'ollama'
+  | 'local-transformers'
+  | 'openai-compatible'
+  | 'diagnostic-mock';
 
 export type ToolPermissionLevel = 'READ_ONLY' | 'WORKSPACE_WRITE' | 'SYSTEM_COMMAND' | 'NETWORK_ACCESS';
 
@@ -302,7 +307,7 @@ export interface SelfRepairResult {
   postRepairVerification: {
     verified: boolean;
     verificationDetails: string;
-    testRunResults?: { passed: number; failed: number };
+    testResults?: { passed: number; failed: number };
   };
   rollbackPerformed: boolean;
   durationMs: number;
