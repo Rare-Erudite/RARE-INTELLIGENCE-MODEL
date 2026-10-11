@@ -9,6 +9,7 @@ import { GeminiModelProvider } from './gemini.js';
 import { OllamaModelProvider } from './ollama.js';
 import { DiagnosticMockProvider } from './diagnostic.js';
 import { LocalTransformersProvider } from './transformers-local.js';
+import { OpenAICompatibleProvider } from './openai-compatible.js';
 import {
   ModelProviderInfo,
   ModelProviderType,
@@ -27,10 +28,18 @@ export class ProviderManager {
     this.registerProvider(new LocalTransformersProvider());
     this.registerProvider(new OllamaModelProvider('llama3.2:1b'));
     this.registerProvider(new GeminiModelProvider('gemini-3.8-flash'));
+    this.registerProvider(new OpenAICompatibleProvider());
     this.registerProvider(new DiagnosticMockProvider());
 
     // By default, preferred zero-cost provider is local-transformers
     this.activeProviderType = 'local-transformers';
+
+    // Optional operator override (e.g. RARE_DEFAULT_PROVIDER=openai-compatible to use a
+    // user-supplied-key or free local OpenAI-compatible endpoint without paid services).
+    const preferredEnv = process.env.RARE_DEFAULT_PROVIDER as ModelProviderType | undefined;
+    if (preferredEnv && this.providers.has(preferredEnv)) {
+      this.activeProviderType = preferredEnv;
+    }
   }
 
   public registerProvider(provider: IModelProvider) {
@@ -123,6 +132,26 @@ export class ProviderManager {
       rejectionReason: ollamaRejectionReason,
     });
 
+    // OpenAI-compatible endpoint (user-supplied key or free local server)
+    const openai = this.getProvider('openai-compatible') as OpenAICompatibleProvider;
+    let openaiEligible = false;
+    let openaiRejectionReason: string | undefined;
+    try {
+      const openaiInfo = await openai.checkAvailability();
+      if (openaiInfo.isAvailable || openaiInfo.isConfigured) {
+        openaiEligible = true;
+      } else {
+        openaiRejectionReason = openaiInfo.statusMessage;
+      }
+    } catch (err: any) {
+      openaiRejectionReason = `Probe failure: ${err.message}`;
+    }
+    evaluated.push({
+      id: 'openai-compatible',
+      eligible: openaiEligible,
+      rejectionReason: openaiRejectionReason,
+    });
+
     // If offline, local execution is mandatory
     if (!isOnline) {
       if (localTransformersEligible) {
@@ -207,6 +236,25 @@ export class ProviderManager {
           candidatesEvaluated: evaluated,
         };
       }
+    }
+
+    // OpenAI-compatible endpoint (user-supplied key or free local server)
+    if (
+      openaiEligible &&
+      (this.activeProviderType === 'openai-compatible' ||
+        (requirements.preferredType === 'online' && !geminiEligible))
+    ) {
+      return {
+        selectedProviderId: 'openai-compatible',
+        providerName: openai.name,
+        reason: openai.isLocalEndpoint
+          ? 'Free local OpenAI-compatible server is active; genuine inference executed at the operator endpoint.'
+          : 'User-configured OpenAI-compatible endpoint (operator-supplied key) is active; genuine inference executed at the operator endpoint.',
+        isLocal: openai.isLocalEndpoint,
+        isOnline: !openai.isLocalEndpoint,
+        isSimulated: false,
+        candidatesEvaluated: evaluated,
+      };
     }
 
     // Online execution with Gemini

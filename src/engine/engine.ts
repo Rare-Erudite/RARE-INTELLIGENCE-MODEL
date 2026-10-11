@@ -239,6 +239,26 @@ export class RareIntelligenceEngine {
         : 'Engine operational in HYBRID ONLINE/OFFLINE mode.',
     };
 
+    // Optional opt-in bootstrap of the in-process local ONNX model.
+    // Disabled by default: loading weights can exceed small container memory limits,
+    // so it is only attempted on explicit opt-in, and any failure degrades gracefully
+    // to the next available provider without crashing startup.
+    if (String(process.env.RARE_AUTO_LOAD_LOCAL_MODEL).toLowerCase() === 'true') {
+      const bootstrapLocal = this.providers.getProvider('local-transformers') as LocalTransformersProvider;
+      void bootstrapLocal
+        .loadModel()
+        .then(() => {
+          this.providers.setActiveProvider('local-transformers');
+          logger.info('Engine', 'Opt-in local ONNX model auto-loaded and set active.');
+        })
+        .catch((err: any) => {
+          logger.warn(
+            'Engine',
+            `Opt-in local model auto-load skipped: ${err.message}. Continuing with other providers.`
+          );
+        });
+    }
+
     logger.info(
       'Engine',
       `Offline startup complete in ${Date.now() - start}ms. State: [${this.operationalState}]. Local Runtime: ${localRuntimeReachable ? 'ONLINE' : 'OFFLINE'}. Storage: [${this.memory.storageType}].`
