@@ -1,16 +1,19 @@
 {
   "metadata": {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "engineVersion": "1.0.0-rc1",
-    "checksum": "eba16af02621459dd8bb2b10bbc49fdf03fa14596191c30738fc142de8a71add",
-    "updatedAt": 1791719386028,
-    "lastBackupAt": 1791719385982,
+    "checksum": "d39d1bbb4c4e99c2a1ad02cfed0217116b2f4fd58d7d7e6400f27d0107ba101b",
+    "updatedAt": 1791725726730,
+    "lastBackupAt": 1791725726711,
+    "filesystemDurability": "ephemeral_sandbox",
     "itemCounts": {
       "memories": 4,
+      "conversations": 0,
       "tasks": 0,
-      "diagnostics": 5,
-      "repairs": 5,
-      "checkpoints": 0
+      "diagnostics": 6,
+      "repairs": 6,
+      "checkpoints": 0,
+      "auditEvents": 0
     }
   },
   "memories": {
@@ -74,6 +77,7 @@
       "isPersistent": true
     }
   },
+  "conversations": {},
   "tasks": {},
   "diagnostics": {
     "diag_c04b3va": {
@@ -125,6 +129,16 @@
       "checksPerformedCount": 9,
       "findings": [],
       "durationMs": 32
+    },
+    "diag_8gznw4q": {
+      "runId": "diag_8gznw4q",
+      "timestamp": 1791725726727,
+      "targetSystem": "RARE-INTELLIGENCE Engine",
+      "version": "1.0.0-rc1",
+      "overallStatus": "HEALTHY",
+      "checksPerformedCount": 9,
+      "findings": [],
+      "durationMs": 12
     }
   },
   "repairs": {
@@ -327,8 +341,53 @@
       },
       "rollbackPerformed": false,
       "durationMs": 60
+    },
+    "rep_test_1791725726729": {
+      "repairId": "rep_test_1791725726729",
+      "findingId": "find_harmless_1791725726728",
+      "targetSubsystem": "syntax_integrity",
+      "status": "REPAIRED_AND_VERIFIED",
+      "checkpointId": "cp_test_1791725726728",
+      "actionsTaken": [
+        {
+          "step": "DETECT_FAULT",
+          "timestamp": 1791725726679,
+          "status": "passed",
+          "details": "Unbalanced brace detected"
+        },
+        {
+          "step": "CREATE_CHECKPOINT",
+          "timestamp": 1791725726689,
+          "status": "passed",
+          "details": "Checkpoint created"
+        },
+        {
+          "step": "APPLY_REMEDIATION",
+          "timestamp": 1791725726709,
+          "status": "passed",
+          "details": "Appended closing brace"
+        },
+        {
+          "step": "INDEPENDENT_VERIFY",
+          "timestamp": 1791725726729,
+          "status": "passed",
+          "details": "Balance check passed"
+        }
+      ],
+      "preRepairEvidence": "Unbalanced brace count: 1",
+      "postRepairVerification": {
+        "verified": true,
+        "verificationDetails": "Brace balance counter restored to 0."
+      },
+      "rollbackPerformed": false,
+      "durationMs": 60
     }
   },
   "checkpoints": {},
+  "providerConfig": {
+    "preferredProvider": "gemini",
+    "localModel": "llama3.2:1b",
+    "autoResumeTasks": true
+  },
   "auditEvents": []
 }

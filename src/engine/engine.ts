@@ -209,7 +209,7 @@ export class RareIntelligenceEngine {
       localStorageAvailable: storageReady,
       localModelAvailable: localModelReady,
       onlineProviderAvailable: isOnline,
-      fullRequestedCapabilityAvailable: isOnline && (localModelReady || this.config.providers.gemini.enabled),
+      fullRequestedCapabilityAvailable: isOnline && (localModelReady || Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY')),
       offlineCapabilities: [
         `Deterministic Tools (${localTools.length} registered)`,
         'Local File Persistence & Rotating Backups',

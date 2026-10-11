@@ -6,6 +6,10 @@
 import { TaskPlan, VerificationCheck, VerificationReport } from '../types.js';
 
 export class OutputVerifier {
+  public evaluatePlan(plan: TaskPlan): VerificationReport {
+    return this.verifyPlanExecution(plan);
+  }
+
   public verifyPlanExecution(plan: TaskPlan): VerificationReport {
     const checks: VerificationCheck[] = [];
     const unverifiedClaims: string[] = [];
