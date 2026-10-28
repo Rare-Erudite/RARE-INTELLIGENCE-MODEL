@@ -14,7 +14,25 @@
     "base_branch": "main",
     "base_sha": "81fd40664ebf338d209d3ba22dd584bd355dab12",
     "layout": "python_engine/ subdirectory; TypeScript app untouched at repo root",
-    "note": "Remote main contains an unrelated TypeScript implementation. The Python engine was NOT pushed as main; it was added under python_engine/ on a branch cut from main."
+    "note": "Remote main contains an unrelated TypeScript implementation. The Python engine was NOT pushed as main; it was added under python_engine/ on a branch cut from main.",
+    "branch_sha": "7df8a38394e3a53a9caab7eb014979c552240b79",
+    "pushed": true,
+    "pr_status": "BLOCKED - HTTP 403 \"Resource not accessible by personal access token\" on POST /pulls. The fine-grained PAT lacks Pull requests: write.",
+    "pr_url": null,
+    "pr_manual_url": "https://github.com/Rare-Erudite/RARE-INTELLIGENCE-MODEL/pull/new/engine-integration-v0.3.1",
+    "ci": {
+      "python_engine_ci": {
+        "conclusion": "success",
+        "url": "https://github.com/Rare-Erudite/RARE-INTELLIGENCE-MODEL/actions/runs/40789377378",
+        "sha": "7df8a38"
+      },
+      "typescript_app_ci": {
+        "conclusion": "success",
+        "url": "https://github.com/Rare-Erudite/RARE-INTELLIGENCE-MODEL/actions/runs/40789377226",
+        "sha": "7df8a38"
+      },
+      "first_run_note": "The first Python CI run on 8da6bea failed at ruff (2 unused imports); fixed in 7df8a38 and re-run green."
+    }
   },
   "github_blocker": {
     "status": "RESOLVED",
@@ -244,7 +262,8 @@
   },
   "bugs_fixed_this_session": [
     "service.py passed EngineConfig to ToolRegistry where a sandbox path was expected (TypeError); switched to build_registry(cfg, retriever=...)",
-    "python_engine/models was a symlink to 396MB of GGUF weights; replaced with an empty dir + .gitkeep so weights are never committed"
+    "python_engine/models was a symlink to 396MB of GGUF weights; replaced with an empty dir + .gitkeep so weights are never committed",
+    "CI caught 2 ruff F401 unused imports in service.py and test_service.py that a local run without ruff installed had missed; fixed in 7df8a38"
   ],
   "known_limitations": [
     "No route in server.ts calls the engine yet; the client is additive and unwired",
