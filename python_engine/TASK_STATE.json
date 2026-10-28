@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "project": "RARE Intelligence Engine",
+  "package": "rare-engine",
+  "version": "0.4.0",
+  "updated_at": "2026-10-29T00:00:00Z",
+  "checkpoint": "engine-integration-v0.3.1",
+  "head_commit": "0f2d525",
+  "head_commit_note": "Local engine HEAD 1095d27 (not 0f2d525, which is its parent). Integration work now lives on branch engine-integration-v0.3.1 of Rare-Erudite/RARE-INTELLIGENCE-MODEL.",
+  "resume_instructions": "Read STATUS.md first, then TEST_REPORT.md. Run `python3 -m pytest -m \"not requires_model\"` to confirm the baseline (expect 204 passed, 3 deselected). Then run `python3 benchmarks/retrieval_eval.py --k 3` (expect P@k 0.385, R@k 1.000, MRR 1.000, negative-control 0.500, 15/17). Then run `python3 scripts/evaluate.py --adapter oracle` (expect 25/25) to confirm the agentic eval harness. Then pick the first item in next_milestones that is not blocked. GitHub push is BLOCKED until a PAT with repo scope is supplied; do not retry auth workarounds.",
+  "repository": {
+    "remote": "https://github.com/Rare-Erudite/RARE-INTELLIGENCE-MODEL",
+    "branch": "engine-integration-v0.3.1",
+    "base_branch": "main",
+    "base_sha": "81fd40664ebf338d209d3ba22dd584bd355dab12",
+    "layout": "python_engine/ subdirectory; TypeScript app untouched at repo root",
+    "note": "Remote main contains an unrelated TypeScript implementation. The Python engine was NOT pushed as main; it was added under python_engine/ on a branch cut from main."
+  },
+  "github_blocker": {
+    "status": "RESOLVED",
+    "detail": "GH_TOKEN supplied and verified: authenticates as Rare-Erudite with admin+push on the repo."
+  },
+  "backup": {
+    "verified": true,
+    "verified_at": "2026-10-29T00:18:00+01:00",
+    "path": "/workspace/backups/rare-engine-0f2d525-20261028T232346Z",
+    "contents": [
+      "rare-engine.bundle (git bundle --all, full history)",
+      "rare-engine-worktree.tar.gz (plain tree, no .git)",
+      "HEAD_SHA.txt"
+    ],
+    "bundle_head": "0f2d525c50afd1f02bf8eda817aa406e568b73e2",
+    "bundle_commits": 10,
+    "restore_verified": true,
+    "restore_method": "git clone <bundle> /tmp/restore-final",
+    "restore_result": "HEAD matched, 10 commits, 61 tracked files, 204 passed / 3 deselected",
+    "earlier_verified_bundle": {
+      "path": "/workspace/backups/rare-engine-14c1729-20261028T231814Z",
+      "head": "14c17295976d6425658eff32e640cfc6abc4f9ad",
+      "commits": 7,
+      "restore_result": "187 passed / 3 deselected"
+    },
+    "excluded": [
+      ".env and real secrets",
+      ".rare/ runtime state and index stores",
+      "models/ and *.gguf weights",
+      "__pycache__, .pytest_cache, .ruff_cache, venvs"
+    ],
+    "note": "Current bundle is at the tip of main and includes the retrieval-eval work. Re-bundle after any further code change."
+  },
+  "environment": {
+    "python": "3.11.15",
+    "pytest": "9.2.0",
+    "llama_cpp_python": "0.3.36",
+    "pydantic": "2.6.1",
+    "cpu_model": "AMD EPYC 9254",
+    "cpu_cores_visible": 48,
+    "cpu_quota_cores": 1,
+    "cpu_quota_raw": "100000 100000",
+    "memory_limit_bytes": 2147483648,
+    "memory_limit_gib": 2,
+    "disk_total_gb": 4.0,
+    "gpu": false,
+    "torch_installed": false,
+    "transformers_installed": false,
+    "ollama_installed": false,
+    "measured_tokens_per_second": 0.08
+  },
+  "model": {
+    "id": "qwen3-0.6b-instruct-q4km",
+    "adapter": "llamacpp",
+    "path": "models/Qwen3-0.6B-Q4_K_M.gguf",
+    "bytes": 396705472,
+    "license": "Apache-2.0",
+    "verified_loading": true,
+    "verified_generation": true,
+    "role": "smoke-test model, not the intelligence target",
+    "thinking_disabled": true,
+    "thinking_disable_method": "chatml prefill of an empty think block (chat_template_kwargs unsupported in llama-cpp-python 0.3.36)",
+    "selection_doc": "MODEL_REGISTRY.md"
+  },
+  "test_results": {
+    "python_engine": {
+      "command": "python -m pytest -p no:warnings",
+      "result": "219 passed, 4 skipped",
+      "note": "3 skips are requires_model (no GGUF in CI); 1 skip is a resume-after-success case the echo adapter does not reach"
+    },
+    "python_service": {
+      "command": "python -m pytest tests/test_service.py",
+      "result": "15 passed, 1 skipped"
+    },
+    "typescript": {
+      "command": "npm test",
+      "result": "30 passed, 0 failed",
+      "note": "28 pre-existing + 2 new Python Engine Contract tests"
+    },
+    "typescript_lint": {
+      "command": "npx tsc --noEmit",
+      "result": "clean, exit 0"
+    },
+    "typescript_build": {
+      "command": "npx vite build",
+      "result": "success, 1674 modules"
+    },
+    "baseline_before_changes": {
+      "typescript": "28 passed, 0 failed; tsc clean; vite build ok"
+    }
+  },
+  "components": {
+    "config": {
+      "file": "rare_engine/config.py",
+      "status": "done",
+      "tested": true
+    },
+    "model_base": {
+      "file": "rare_engine/models/base.py",
+      "status": "done",
+      "tested": true
+    },
+    "adapter_llamacpp": {
+      "file": "rare_engine/models/llamacpp_adapter.py",
+      "status": "done",
+      "tested": true,
+      "tested_against_real_weights": true
+    },
+    "adapter_openai_compat": {
+      "file": "rare_engine/models/openai_adapter.py",
+      "status": "done",
+      "tested": true,
+      "tested_against_live_endpoint": false
+    },
+    "adapter_echo": {
+      "file": "rare_engine/models/echo_adapter.py",
+      "status": "done",
+      "tested": true
+    },
+    "protocol": {
+      "file": "rare_engine/protocol.py",
+      "status": "done",
+      "tested": true
+    },
+    "orchestrator": {
+      "file": "rare_engine/orchestrator.py",
+      "status": "done",
+      "tested": true
+    },
+    "resume": {
+      "file": "rare_engine/orchestrator.py",
+      "status": "done",
+      "tested": true,
+      "tests": 16,
+      "added": "2026-10-28"
+    },
+    "tools": {
+      "file": "rare_engine/tools.py",
+      "status": "done",
+      "tested": true
+    },
+    "state": {
+      "file": "rare_engine/state.py",
+      "status": "done",
+      "tested": true
+    },
+    "logging": {
+      "file": "rare_engine/logging.py",
+      "status": "done",
+      "tested": true
+    },
+    "cli": {
+      "file": "rare_engine/cli.py",
+      "status": "done",
+      "tested": false,
+      "note": "exercised manually: doctor, tools, run, status, resume"
+    },
+    "eval_harness": {
+      "file": "benchmarks/",
+      "status": "done",
+      "tested": true,
+      "tests": 18,
+      "tasks": 25,
+      "added": "2026-10-28"
+    },
+    "eval_cli": {
+      "file": "scripts/evaluate.py",
+      "status": "done",
+      "tested": true
+    },
+    "example": {
+      "file": "examples/e2e_local.py",
+      "status": "done",
+      "tested": false
+    },
+    "fetch_script": {
+      "file": "scripts/fetch_model.py",
+      "status": "done",
+      "tested": false
+    },
+    "ci_workflow": {
+      "file": ".github/workflows/ci.yml",
+      "status": "done",
+      "tested": false,
+      "note": "never executed - no remote"
+    },
+    "retrieval_memory": {
+      "status": "implemented_and_tested",
+      "path": "rare_engine/memory/",
+      "modules": [
+        "tokenizer.py",
+        "bm25.py",
+        "chunking.py",
+        "index.py",
+        "retrieval.py"
+      ],
+      "algorithm": "BM25 (Okapi) with +1 IDF form",
+      "tests": 76,
+      "tools": [
+        "retrieve",
+        "remember"
+      ],
+      "cli": [
+        "index",
+        "search",
+        "remember",
+        "memory"
+      ]
+    },
+    "http_service": {
+      "status": "implemented+tested",
+      "file": "rare_engine/service.py",
+      "endpoints": [
+        "GET /health",
+        "POST /v1/tasks",
+        "POST /v1/tasks/{id}/resume",
+        "GET /v1/tasks",
+        "GET /v1/tasks/{id}",
+        "POST /v1/memory/search",
+        "POST /v1/memory/remember"
+      ]
+    },
+    "ts_client": {
+      "status": "implemented+tested",
+      "file": "src/integration/python_engine_client.ts"
+    }
+  },
+  "bugs_fixed_this_session": [
+    "service.py passed EngineConfig to ToolRegistry where a sandbox path was expected (TypeError); switched to build_registry(cfg, retriever=...)",
+    "python_engine/models was a symlink to 396MB of GGUF weights; replaced with an empty dir + .gitkeep so weights are never committed"
+  ],
+  "known_limitations": [
+    "No route in server.ts calls the engine yet; the client is additive and unwired",
+    "No deployment to Vercel or anywhere else",
+    "No job queue: POST /v1/tasks blocks until the task finishes",
+    "No streaming in the model contract",
+    "Web research, audio transcription, document processing and self-repair loops are NOT implemented this run",
+    "Model quality is not measured: only echo/oracle adapters have run, which is not model intelligence"
+  ],
+  "next_milestones": [
+    "Wire PythonEngineClient into a single server.ts route behind a feature flag",
+    "Add a job queue + polling so long tasks do not block an HTTP request",
+    "Measure real model quality with a live endpoint (RARE_OPENAI_BASE_URL)",
+    "Retrieval eval improvements: query-term coverage threshold for negative controls"
+  ],
+  "not_started": [
+    "multi-agent / sub-task decomposition",
+    "long-term memory across tasks",
+    "dense retrieval / embeddings / vector store",
+    "web or browser tool",
+    "document intelligence (PDF/DOCX/XLSX)",
+    "model and tool routing",
+    "universal software building / TDD repair loop",
+    "multimodal processing",
+    "self-diagnostics and isolated repair",
+    "streaming responses",
+    "SQLite state backend"
+  ],
+  "integration": {
+    "target": "Rare-Erudite/COMPLETED",
+    "branch": "New-Fixes-by-Erudite",
+    "stack": "Vercel + Supabase",
+    "status": "NOT INTEGRATED - contract only, see INTEGRATION_CONTRACT.md",
+    "touched": false
+  }
+}

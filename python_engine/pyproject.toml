@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rare-engine"
+version = "0.1.0"
+description = "RARE Intelligence Engine - a persistent, model-agnostic autonomous engineering engine."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "RARE Intelligence Engine" }]
+keywords = ["agents", "orchestration", "llm", "autonomy", "engineering"]
+
+dependencies = [
+    "pydantic>=2.6,<3",
+    "PyYAML>=6.0",
+    "httpx>=0.27",
+    "typer>=0.12",
+    "rich>=13.7",
+]
+
+[project.optional-dependencies]
+local = ["llama-cpp-python>=0.3.16"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "pytest-cov>=5.0"]
+
+[project.scripts]
+rare = "rare_engine.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["rare_engine*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "slow: tests that load a real model and take minutes",
+    "requires_model: tests that need a downloaded GGUF weight file",
+]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "BLE", "G", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# typer's API is built on function calls in argument defaults; B008 is a false
+# positive for every typer command.
+"rare_engine/cli.py" = ["B008"]

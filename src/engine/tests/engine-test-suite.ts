@@ -20,6 +20,7 @@ import { assistantFoundation } from '../assistant/assistant-foundation.js';
 import { authManager } from '../security/auth.js';
 import { networkManager } from '../network/connection-manager.js';
 import { RareIntelligenceClient } from '../../integration/rare_intelligence_client.js';
+import { PythonEngineClient } from '../../integration/python_engine_client.js';
 
 export interface TestCaseResult {
   suite: string;
@@ -343,6 +344,112 @@ export class EngineTestSuiteRunner {
       if (typeof client.enqueueTask !== 'function') throw new Error('Client missing enqueueTask method');
       if (typeof client.createConversation !== 'function') throw new Error('Client missing createConversation method');
       if (typeof client.sendMessageToConversation !== 'function') throw new Error('Client missing sendMessageToConversation method');
+    }, results);
+
+    // --- Suite 17b: Python Engine HTTP Contract ---
+    // Verifies the client against the exact wire shapes emitted by
+    // python_engine/rare_engine/service.py. Uses a stubbed fetch so the test
+    // needs no running Python process, but the payloads are copied from the
+    // service's response models, so a shape drift on either side fails here.
+    await this.test('Python Engine Contract', 'Maps snake_case wire payloads to camelCase results', async () => {
+      const originalFetch = globalThis.fetch;
+      const calls: Array<{ url: string; init: any }> = [];
+      globalThis.fetch = (async (url: any, init: any) => {
+        calls.push({ url: String(url), init });
+        const body = String(url).endsWith('/health')
+          ? {
+              ok: true,
+              version: '0.3.1',
+              model_id: 'echo',
+              adapter: 'echo',
+              model_ready: true,
+              detail: '',
+              uptime_s: 1.5,
+            }
+          : {
+              task_id: 'task_abc123',
+              status: 'succeeded',
+              result: 'done',
+              steps: 2,
+              duration_s: 0.4,
+              total_tokens: 42,
+              error: null,
+              error_code: null,
+              resumed_from_step: null,
+            };
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          text: async () => JSON.stringify(body),
+        } as any;
+      }) as any;
+
+      try {
+        const client = new PythonEngineClient({
+          baseUrl: 'http://127.0.0.1:8099/',
+          token: 'test-token',
+        });
+
+        const health = await client.health();
+        if (health.modelId !== 'echo') throw new Error('health.modelId not mapped');
+        if (health.modelReady !== true) throw new Error('health.modelReady not mapped');
+        if (health.uptimeS !== 1.5) throw new Error('health.uptimeS not mapped');
+
+        const run = await client.runTask('do a thing');
+        if (run.taskId !== 'task_abc123') throw new Error('run.taskId not mapped');
+        if (run.totalTokens !== 42) throw new Error('run.totalTokens not mapped');
+        if (run.durationS !== 0.4) throw new Error('run.durationS not mapped');
+        if (run.status !== 'succeeded') throw new Error('run.status not mapped');
+
+        // Trailing slash must be stripped, not doubled.
+        if (calls[0].url !== 'http://127.0.0.1:8099/health') {
+          throw new Error(`baseUrl not normalised: ${calls[0].url}`);
+        }
+        // Auth header must be present on every call.
+        if (calls[0].init.headers.Authorization !== 'Bearer test-token') {
+          throw new Error('missing bearer token');
+        }
+        // Request body must use the engine's snake_case field names.
+        const sent = JSON.parse(calls[1].init.body);
+        if (!('model_id' in sent)) throw new Error('request body must use model_id');
+        if (!('goal' in sent)) throw new Error('request body must include goal');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    }, results);
+
+    await this.test('Python Engine Contract', 'Surfaces structured engine error codes', async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = (async () => ({
+        ok: false,
+        status: 409,
+        statusText: 'Conflict',
+        text: async () =>
+          JSON.stringify({
+            detail: { code: 'task_not_resumable', message: 'task already succeeded' },
+          }),
+      })) as any;
+
+      try {
+        const client = new PythonEngineClient({
+          baseUrl: 'http://127.0.0.1:8099',
+          token: 't',
+        });
+        let caught: any = null;
+        try {
+          await client.resumeTask('task_done');
+        } catch (err) {
+          caught = err;
+        }
+        if (!caught) throw new Error('expected an error for 409');
+        if (caught.code !== 'task_not_resumable') {
+          throw new Error(`expected code task_not_resumable, got ${caught.code}`);
+        }
+        if (caught.status !== 409) throw new Error(`expected status 409, got ${caught.status}`);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
     }, results);
 
     // --- Suite 18: Conversation Lifecycle & Durable Persistence ---

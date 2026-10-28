@@ -7,3 +7,13 @@ coverage/
 data/models_cache/
 .env*
 !.env.example
+
+# --- Python engine (python_engine/) ---
+python_engine/.rare/
+python_engine/**/__pycache__/
+python_engine/**/*.pyc
+python_engine/.pytest_cache/
+python_engine/.ruff_cache/
+python_engine/*.egg-info/
+python_engine/models/*.gguf
+python_engine/.venv/
