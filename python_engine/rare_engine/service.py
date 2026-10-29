@@ -79,6 +79,11 @@ class RunRequest(BaseModel):
     goal: str = Field(..., min_length=1, max_length=8000)
     model_id: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # Client-supplied idempotency key. When a caller retries after a crash it
+    # resends the same task_id, so the engine overwrites one task record
+    # instead of creating a second one. Optional: omitting it keeps the
+    # engine-generated id and the original behaviour.
+    task_id: str | None = Field(default=None, max_length=128)
 
 
 class RunResponse(BaseModel):
@@ -257,6 +262,7 @@ def create_app(
             result = await _orchestrator().run(
                 goal=req.goal,
                 model_id=req.model_id,
+                task_id=req.task_id,
                 metadata=req.metadata,
             )
         except RareError as exc:
