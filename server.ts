@@ -17,6 +17,13 @@ import { DeviceHardwareEvaluator } from './src/engine/providers/device-evaluator
 import { LocalModelManager } from './src/engine/providers/local-runtime.js';
 import { authManager } from './src/engine/security/auth.js';
 import { defaultSecurityGuard } from './src/engine/security/permissions.js';
+import {
+  createEngineRouter,
+  startJobWorker,
+  isEngineFeatureEnabled,
+} from './src/integration/engine_route.js';
+import { JobQueue } from './src/jobs/jobQueue.js';
+import { PythonEngineClient } from './src/integration/python_engine_client.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1004,6 +1011,36 @@ apiRouter.get('/diagnostics/logs', authManager.requireRole(['developer']), (_req
 // Mount API routers
 app.use('/api/v1', apiRouter);
 app.use('/api', apiRouter);
+
+// ==========================================
+// PYTHON ENGINE INTEGRATION (feature-gated)
+// ==========================================
+// Mounted BEFORE the error handler so AppErrors thrown by the engine routes
+// are formatted by the same centralized middleware as every other route.
+// When ENGINE_FEATURE_ENABLED !== 'true' these paths return 404 and the rest
+// of the app is completely unaffected.
+if (isEngineFeatureEnabled()) {
+  const engineQueue = new JobQueue();
+  app.use('/api/v1/engine', createEngineRouter({ queue: engineQueue }));
+
+  const engineBaseUrl = process.env.RARE_ENGINE_BASE_URL;
+  const engineToken = process.env.RARE_SERVICE_TOKEN;
+  if (engineBaseUrl && engineToken) {
+    const workerClient = new PythonEngineClient({
+      baseUrl: engineBaseUrl,
+      token: engineToken,
+      timeoutMs: parseInt(process.env.ENGINE_TIMEOUT_MS || '900000', 10),
+    });
+    startJobWorker(engineQueue, workerClient);
+    logger.info('PythonEngine', 'Engine route enabled; durable job worker started.');
+  } else {
+    logger.warn(
+      'PythonEngine',
+      'Engine route enabled but RARE_ENGINE_BASE_URL/RARE_SERVICE_TOKEN are unset. ' +
+        'Jobs will be recorded but cannot run.',
+    );
+  }
+}
 
 // ==========================================
 // CENTRALIZED EXPRESS ERROR MIDDLEWARE

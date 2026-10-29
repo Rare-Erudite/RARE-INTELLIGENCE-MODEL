@@ -14,6 +14,7 @@ data/models_cache/
 data/rare_intelligence_memory.json
 data/rare_intelligence_memory.corrupt.*.json
 data/backups/
+data/jobs/
 !data/rare_intelligence_memory.example.json
 
 # --- Python engine (python_engine/) ---

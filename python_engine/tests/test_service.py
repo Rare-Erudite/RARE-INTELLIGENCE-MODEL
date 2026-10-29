@@ -139,6 +139,42 @@ def test_run_task_rejects_blank_goal(client: TestClient) -> None:
     assert r.status_code == 422
 
 
+def test_client_supplied_task_id_is_honoured(client: TestClient) -> None:
+    """The idempotency key the TypeScript job queue relies on.
+
+    A caller that retries after a crash resends the same task_id, so the
+    engine must overwrite one record rather than create a second.
+    """
+    r = client.post(
+        "/v1/tasks",
+        json={"goal": "say hello", "task_id": "job_abc123"},
+        headers=auth(),
+    )
+    assert r.status_code == 200
+    assert r.json()["task_id"] == "job_abc123"
+
+    # The record is retrievable under the caller's id, not a generated one.
+    got = client.get("/v1/tasks/job_abc123", headers=auth())
+    assert got.status_code == 200
+    assert got.json()["task_id"] == "job_abc123"
+
+
+def test_omitting_task_id_still_generates_one(client: TestClient) -> None:
+    """Backwards compatibility: the field is optional."""
+    r = client.post("/v1/tasks", json={"goal": "say hello"}, headers=auth())
+    assert r.status_code == 200
+    assert r.json()["task_id"].startswith("task_")
+
+
+def test_task_id_is_length_bounded(client: TestClient) -> None:
+    r = client.post(
+        "/v1/tasks",
+        json={"goal": "say hello", "task_id": "x" * 129},
+        headers=auth(),
+    )
+    assert r.status_code == 422
+
+
 def test_get_task_round_trips(client: TestClient) -> None:
     created = client.post("/v1/tasks", json={"goal": "say hello"}, headers=auth()).json()
     r = client.get(f"/v1/tasks/{created['task_id']}", headers=auth())

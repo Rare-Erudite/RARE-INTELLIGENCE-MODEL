@@ -41,3 +41,8 @@ jobs:
 
       - name: Tests
         run: npm test
+
+      # Job queue + engine route tests. Separate step so a failure here is
+      # distinguishable from a failure in the engine's own suite.
+      - name: Job queue & engine route tests
+        run: npm run test:jobs

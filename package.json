@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx -e \"import { EngineTestSuiteRunner } from './src/engine/tests/engine-test-suite.ts'; EngineTestSuiteRunner.runAllTests().then(r => { console.log(JSON.stringify(r, null, 2)); process.exit(r.failedCount === 0 ? 0 : 1); });\""
+    "test": "tsx -e \"import { EngineTestSuiteRunner } from './src/engine/tests/engine-test-suite.ts'; EngineTestSuiteRunner.runAllTests().then(r => { console.log(JSON.stringify(r, null, 2)); process.exit(r.failedCount === 0 ? 0 : 1); });\"",
+    "test:jobs": "node --import tsx --test src/jobs/jobQueue.test.ts src/integration/engine_route.test.ts",
+    "test:all": "npm run test && npm run test:jobs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
