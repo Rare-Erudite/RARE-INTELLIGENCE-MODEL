@@ -8,6 +8,14 @@ data/models_cache/
 .env*
 !.env.example
 
+# --- Runtime state (never commit private application data) ---
+# The FilePersistentStore regenerates this from seed knowledge on first run.
+# Commit only the redacted schema example.
+data/rare_intelligence_memory.json
+data/rare_intelligence_memory.corrupt.*.json
+data/backups/
+!data/rare_intelligence_memory.example.json
+
 # --- Python engine (python_engine/) ---
 python_engine/.rare/
 python_engine/**/__pycache__/
