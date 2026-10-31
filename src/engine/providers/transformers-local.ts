@@ -15,6 +15,7 @@ import {
   ModelProviderType,
 } from '../types.js';
 import { logger } from '../security/logger.js';
+import { DeviceHardwareEvaluator } from './device-evaluator.js';
 
 export interface LocalModelManifest {
   name: string;
@@ -114,6 +115,19 @@ export class LocalTransformersProvider implements IModelProvider {
       throw new Error('Local model loading is already in progress.');
     }
 
+    const host = DeviceHardwareEvaluator.inspectHostResources();
+    const requiredRamMB = this.manifest.estimatedMemoryMB + 512;
+    if (host.freeMemMB < requiredRamMB) {
+      throw new Error(
+        `Local model load refused before runtime initialization: estimated ${this.manifest.estimatedMemoryMB}MB model memory plus 512MB runtime reserve requires ${requiredRamMB}MB free, but only ${host.freeMemMB}MB is available.`
+      );
+    }
+    if (!this.hasCachedWeights() && host.freeDiskMB < this.manifest.diskSizeMB + 500) {
+      throw new Error(
+        `Local model download refused: estimated ${this.manifest.diskSizeMB}MB weights plus 500MB safety margin requires ${this.manifest.diskSizeMB + 500}MB free disk, but only ${host.freeDiskMB}MB is available.`
+      );
+    }
+
     this.isLoading = true;
     this.lastError = null;
     this.loadProgressPercent = 5;
@@ -168,7 +182,7 @@ export class LocalTransformersProvider implements IModelProvider {
         isAvailable: true,
         isConfigured: true,
         supportsFunctionCalling: false,
-        supportsStreaming: true,
+        supportsStreaming: false,
         license: this.manifest.license,
         freeTierStatus: {
           isFree: true,
@@ -186,7 +200,7 @@ export class LocalTransformersProvider implements IModelProvider {
       isAvailable: false,
       isConfigured: true,
       supportsFunctionCalling: false,
-      supportsStreaming: true,
+      supportsStreaming: false,
       license: this.manifest.license,
       freeTierStatus: {
         isFree: true,

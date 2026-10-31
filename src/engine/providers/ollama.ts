@@ -27,6 +27,7 @@ export class OllamaModelProvider implements IModelProvider, ILocalInferenceRunti
   public readonly runtimeType = 'ollama' as const;
   public readonly modelIdentifier: string;
   private hostUrl: string;
+  private inferenceVerified = false;
 
   constructor(model: string = 'llama3.2:1b', hostUrl?: string) {
     this.modelIdentifier = model;
@@ -44,6 +45,26 @@ export class OllamaModelProvider implements IModelProvider, ILocalInferenceRunti
 
   public setHostUrl(url: string): void {
     this.hostUrl = url.replace(/\/+$/, '');
+    this.inferenceVerified = false;
+  }
+
+  public hasVerifiedInference(): boolean {
+    return this.inferenceVerified;
+  }
+
+  public async getLoadedModels(): Promise<string[]> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1200);
+      if (typeof timeoutId.unref === 'function') timeoutId.unref();
+      const response = await fetch(`${this.hostUrl}/api/ps`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!response.ok) return [];
+      const payload = (await response.json()) as { models?: Array<{ name?: string; model?: string }> };
+      return (payload.models || []).map((model) => model.name || model.model || '').filter(Boolean);
+    } catch {
+      return [];
+    }
   }
 
   public async isReachable(): Promise<boolean> {
@@ -148,11 +169,11 @@ export class OllamaModelProvider implements IModelProvider, ILocalInferenceRunti
 
       onProgress({
         modelName,
-        stage: 'ready',
-        progressPercent: 100,
+        stage: 'verifying_integrity',
+        progressPercent: 99,
         downloadedBytes: total,
         totalBytes: total,
-        statusMessage: `Model "${modelName}" successfully installed and verified.`,
+        statusMessage: `Download finished for "${modelName}"; checking runtime installation.`,
         updatedAt: Date.now(),
       });
       return true;
@@ -199,8 +220,8 @@ export class OllamaModelProvider implements IModelProvider, ILocalInferenceRunti
           modelIdentifier: this.modelIdentifier,
           isAvailable: false,
           isConfigured: false,
-          supportsFunctionCalling: true,
-          supportsStreaming: true,
+          supportsFunctionCalling: false,
+          supportsStreaming: false,
           license: 'Open-Weights (Llama / Mistral / Qwen)',
           freeTierStatus: {
             isFree: true,
@@ -212,24 +233,31 @@ export class OllamaModelProvider implements IModelProvider, ILocalInferenceRunti
       }
 
       const hasSelectedModel = runtimeInfo.installedModels.some((m) =>
-        m.name.toLowerCase().startsWith(this.modelIdentifier.toLowerCase())
+        m.name.toLowerCase().replace(/:latest$/, '') === this.modelIdentifier.toLowerCase().replace(/:latest$/, '')
       );
+      const canLoadOnHost = runtimeInfo.modelLoaded ||
+        DeviceHardwareEvaluator.assessModel(this.modelIdentifier).isCompatibleWithHost;
+      const isAvailable = hasSelectedModel && canLoadOnHost;
 
       return {
         id: this.id,
         name: this.name,
         modelIdentifier: this.modelIdentifier,
-        isAvailable: hasSelectedModel,
+        isAvailable,
         isConfigured: true,
-        supportsFunctionCalling: true,
-        supportsStreaming: true,
+        supportsFunctionCalling: false,
+        supportsStreaming: false,
         license: 'Open-Weights / Self-Hosted (100% Free Local Compute)',
         freeTierStatus: {
           isFree: true,
-          quotaNotes: `Local compute active. ${runtimeInfo.installedModels.length} models installed locally.`,
+          quotaNotes: `${runtimeInfo.installedModels.length} local models installed. Selected model ${hasSelectedModel ? 'is installed' : 'is missing'}; ${runtimeInfo.modelLoaded ? 'it is loaded' : 'it is not loaded'}.`,
           rateLimitNotes: 'Hardware bound; zero network dependency',
         },
-        statusMessage: runtimeInfo.statusMessage,
+        statusMessage: isAvailable
+          ? runtimeInfo.statusMessage
+          : hasSelectedModel
+          ? `${runtimeInfo.statusMessage} Available RAM is below the estimated safe loading budget.`
+          : runtimeInfo.statusMessage,
       };
     } catch (err: any) {
       return {
@@ -238,8 +266,8 @@ export class OllamaModelProvider implements IModelProvider, ILocalInferenceRunti
         modelIdentifier: this.modelIdentifier,
         isAvailable: false,
         isConfigured: false,
-        supportsFunctionCalling: true,
-        supportsStreaming: true,
+        supportsFunctionCalling: false,
+        supportsStreaming: false,
         license: 'Open-Weights (Llama / Mistral / Qwen)',
         freeTierStatus: {
           isFree: true,
@@ -300,6 +328,7 @@ export class OllamaModelProvider implements IModelProvider, ILocalInferenceRunti
       }
 
       const data = (await res.json()) as { response: string; prompt_eval_count?: number; eval_count?: number };
+      this.inferenceVerified = typeof data.response === 'string' && data.response.trim().length > 0;
       const latencyMs = Date.now() - startTime;
 
       return {

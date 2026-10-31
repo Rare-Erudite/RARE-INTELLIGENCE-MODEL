@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "schemaVersion": 2,
+    "engineVersion": "1.0.0-rc1",
+    "checksum": "",
+    "updatedAt": 0,
+    "lastBackupAt": 0,
+    "filesystemDurability": "unknown",
+    "itemCounts": {}
+  },
+  "memories": {},
+  "conversations": {},
+  "tasks": {},
+  "diagnostics": {},
+  "repairs": {},
+  "checkpoints": {},
+  "providerConfig": {
+    "preferredProvider": "gemini",
+    "localModel": "llama3.2:1b",
+    "autoResumeTasks": true
+  },
+  "auditEvents": []
+}

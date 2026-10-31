@@ -32,6 +32,7 @@ export type ErrorCode =
   | 'TOOL_EXECUTION_FAILED'
   | 'PATH_TRAVERSAL_BLOCKED'
   | 'STORAGE_PERSISTENCE_FAILED'
+  | 'IDEMPOTENCY_CONFLICT'
   | 'INVALID_MODEL_RESPONSE'
   | 'PLANNING_OR_EXECUTION_FAILED'
   | 'VERIFICATION_FAILED'
@@ -451,6 +452,9 @@ export interface LocalRuntimeInfo {
   endpointUrl: string;
   isReachable: boolean;
   activeModel: string;
+  modelInstalled: boolean;
+  modelLoaded: boolean;
+  inferenceVerified: boolean;
   installedModels: LocalInstalledModel[];
   hardwareResources: HardwareResourceSummary;
   statusMessage: string;
