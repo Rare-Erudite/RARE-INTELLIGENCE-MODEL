@@ -20,6 +20,7 @@ export interface TargetDeviceProfile {
 }
 
 export class DeviceHardwareEvaluator {
+  private static readonly runtimeReserveMB = 512;
   private static targetProfileOverride: 'host' | 'mobile_android' | null = null;
 
   public static setTargetProfileOverride(profile: 'host' | 'mobile_android' | null): void {
@@ -134,6 +135,9 @@ export class DeviceHardwareEvaluator {
 
   public static getKnownModelCatalog(): ModelCompatibilityAssessment[] {
     const host = this.inspectHostResources();
+    const fitsHost = (estimatedRamMB: number, estimatedDiskMB: number): boolean =>
+      host.freeMemMB >= estimatedRamMB + this.runtimeReserveMB &&
+      host.freeDiskMB >= estimatedDiskMB + 500;
 
     return [
       {
@@ -143,11 +147,11 @@ export class DeviceHardwareEvaluator {
         estimatedDiskMB: 1300,
         contextWindowLimit: 8192,
         quantization: 'Q4_K_M',
-        isCompatibleWithHost: host.totalMemMB >= 2048 && host.freeDiskMB >= 1500,
+        isCompatibleWithHost: fitsHost(1450, 1300),
         isCompatibleWithTargetPhone: true, // Suitable for Android devices with >= 4GB RAM
         readinessStatus: 'requires_download',
         recommendationNotes:
-          'Optimal lightweight model for mobile edge & offline operation. Low latency, compact storage, acceptable reasoning for quick offline planning.',
+          `Estimated ${1450 + this.runtimeReserveMB}MB available RAM and 1800MB disk required including safety margins. ${fitsHost(1450, 1300) ? 'Current host meets' : 'Current host does not meet'} this estimate.`,
       },
       {
         modelName: 'qwen2.5-coder:0.5b',
@@ -156,11 +160,11 @@ export class DeviceHardwareEvaluator {
         estimatedDiskMB: 600,
         contextWindowLimit: 4096,
         quantization: 'Q4_K_M',
-        isCompatibleWithHost: host.freeDiskMB >= 800,
+        isCompatibleWithHost: fitsHost(750, 600),
         isCompatibleWithTargetPhone: true,
         readinessStatus: 'requires_download',
         recommendationNotes:
-          'Ultra-compact offline code generation and syntax inspection model. Runs comfortably on virtually any Android or desktop target.',
+          `Estimated ${750 + this.runtimeReserveMB}MB available RAM and 1100MB disk required including safety margins. ${fitsHost(750, 600) ? 'Current host meets' : 'Current host does not meet'} this estimate.`,
       },
       {
         modelName: 'llama3.2:3b',
@@ -169,11 +173,11 @@ export class DeviceHardwareEvaluator {
         estimatedDiskMB: 2200,
         contextWindowLimit: 8192,
         quantization: 'Q4_K_M',
-        isCompatibleWithHost: host.totalMemMB >= 6000 && host.freeDiskMB >= 2500,
+        isCompatibleWithHost: fitsHost(3600, 2200),
         isCompatibleWithTargetPhone: false, // Exceeds 1.6GB mobile free RAM ceiling
         readinessStatus: 'requires_download',
         recommendationNotes:
-          'High quality reasoning for desktop workstations with >= 8GB RAM. Not recommended for standard mobile Android targets due to thermal limits.',
+          `Estimated ${3600 + this.runtimeReserveMB}MB available RAM and 2700MB disk required including safety margins. ${fitsHost(3600, 2200) ? 'Current host meets' : 'Current host does not meet'} this estimate.`,
       },
       {
         modelName: 'rare-diagnostic-engine-v1',
@@ -209,11 +213,12 @@ export class DeviceHardwareEvaluator {
       estimatedDiskMB: 2000,
       contextWindowLimit: 4096,
       quantization: 'Unknown',
-      isCompatibleWithHost: host.totalMemMB >= 4000 && host.freeDiskMB >= 2500,
+      isCompatibleWithHost:
+        host.freeMemMB >= 2500 + this.runtimeReserveMB && host.freeDiskMB >= 2500 + 500,
       isCompatibleWithTargetPhone: false,
       readinessStatus: 'requires_download',
       recommendationNotes:
-        'Custom local model. Confirm sufficient free RAM (>= 3GB) and disk storage before initiating download.',
+        `Uncataloged models use a conservative 2500MB RAM and 2000MB disk estimate; ${this.runtimeReserveMB}MB RAM and 500MB disk safety margins are added. Current host ${host.freeMemMB}MB free RAM and ${host.freeDiskMB}MB free disk.`,
     };
   }
 }

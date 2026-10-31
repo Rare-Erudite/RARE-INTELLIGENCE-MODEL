@@ -12,7 +12,8 @@
     "lint": "tsc --noEmit",
     "test": "tsx -e \"import { EngineTestSuiteRunner } from './src/engine/tests/engine-test-suite.ts'; EngineTestSuiteRunner.runAllTests().then(r => { console.log(JSON.stringify(r, null, 2)); process.exit(r.failedCount === 0 ? 0 : 1); });\"",
     "test:jobs": "node --import tsx --test src/jobs/jobQueue.test.ts src/integration/engine_route.test.ts",
-    "test:all": "npm run test && npm run test:jobs"
+    "test:providers": "node --import tsx --test src/engine/providers/local-runtime.test.ts",
+    "test:all": "npm run test && npm run test:jobs && npm run test:providers"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

@@ -181,12 +181,11 @@ export class RareIntelligenceEngine {
     const ollamaProvider = this.providers.getProvider('ollama') as OllamaModelProvider;
     let localModelReady = false;
     let localRuntimeReachable = false;
+    let localRuntimeInfo: LocalRuntimeInfo | null = null;
     try {
-      const localRuntimeInfo = await ollamaProvider.getLocalRuntimeInfo();
+      localRuntimeInfo = await ollamaProvider.getLocalRuntimeInfo();
       localRuntimeReachable = localRuntimeInfo.isReachable;
-      localModelReady = localRuntimeInfo.installedModels.some((m) =>
-        m.name.toLowerCase().startsWith(ollamaProvider.modelIdentifier.toLowerCase())
-      );
+      localModelReady = (await ollamaProvider.checkAvailability()).isAvailable;
     } catch {
       localModelReady = false;
       localRuntimeReachable = false;
@@ -224,7 +223,7 @@ export class RareIntelligenceEngine {
         'Syntax Integrity & Code Analysis',
         'Self-Diagnostics & Self-Repair Engine',
         localModelReady
-          ? `Local Model Inference (${ollamaProvider.modelIdentifier})`
+          ? `Local Model Available (${ollamaProvider.modelIdentifier}${localRuntimeInfo?.inferenceVerified ? ', inference previously verified' : ', inference not yet verified'})`
           : 'Diagnostic Sandbox Mock Inference',
       ],
       networkDependentCapabilities: [
@@ -234,7 +233,7 @@ export class RareIntelligenceEngine {
       ],
       summaryMessage: !isOnline
         ? (localModelReady
-            ? 'Engine operational in OFFLINE mode with verified local open-weight model.'
+            ? `Engine operational in OFFLINE mode with local model available${localRuntimeInfo?.inferenceVerified ? ' and inference previously verified' : '; inference not yet verified'}.`
             : 'Engine operational in OFFLINE mode with deterministic tools and diagnostic sandbox (no local AI daemon detected).')
         : 'Engine operational in HYBRID ONLINE/OFFLINE mode.',
     };
@@ -297,9 +296,8 @@ export class RareIntelligenceEngine {
     const isTransformersReady = localTransformersProvider.isReady;
     const hasCachedWeights = localTransformersProvider.hasCachedWeights();
 
-    const localModelReady = isTransformersReady || localRuntimeInfo.installedModels.some((m) =>
-      m.name.toLowerCase().startsWith(ollamaProvider.modelIdentifier.toLowerCase())
-    );
+    const ollamaInfo = providerInfos.find((provider) => provider.id === 'ollama');
+    const localModelReady = isTransformersReady || Boolean(ollamaInfo?.isAvailable);
 
     // Derive operational state
     let state: EngineOperationalState = 'HEALTHY' as any;
@@ -328,8 +326,8 @@ export class RareIntelligenceEngine {
         'Syntax Integrity & Code Analysis',
         'Self-Diagnostics & Self-Repair Engine',
         localModelReady
-          ? `Local Model Inference (${isTransformersReady ? localTransformersProvider.modelIdentifier : ollamaProvider.modelIdentifier})`
-          : (hasCachedWeights ? 'Local Model Verified on Disk (Qwen2.5-0.5B ONNX Q4, 786MB)' : 'Diagnostic Sandbox Mock Inference'),
+          ? `Local Model Available (${isTransformersReady ? localTransformersProvider.modelIdentifier : ollamaProvider.modelIdentifier}${localRuntimeInfo.inferenceVerified ? ', inference previously verified' : ', inference not yet verified'})`
+          : (hasCachedWeights ? 'Local Model Weights Present on Disk (not loaded; inference not available)' : 'Diagnostic Sandbox Mock Inference'),
       ],
       networkDependentCapabilities: [
         'Google Gemini Remote Inference',
@@ -338,7 +336,7 @@ export class RareIntelligenceEngine {
       ],
       summaryMessage: !isOnline
         ? (localModelReady
-            ? 'Engine operational in OFFLINE mode with verified local open-weight model.'
+            ? `Engine operational in OFFLINE mode with local model available${localRuntimeInfo.inferenceVerified || isTransformersReady ? ' and inference verified' : '; inference not yet verified'}.`
             : 'Engine operational in OFFLINE mode with deterministic tools and diagnostic sandbox (no local AI daemon detected).')
         : 'Engine operational in HYBRID ONLINE/OFFLINE mode.',
     };
