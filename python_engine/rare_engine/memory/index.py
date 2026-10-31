@@ -54,7 +54,7 @@ class SearchHit:
 
     __slots__ = (
         "chunk_id", "doc_id", "score", "text", "start", "end",
-        "source", "title", "meta",
+        "source", "title", "meta", "namespace",
     )
 
     def __init__(
@@ -68,6 +68,7 @@ class SearchHit:
         source: str,
         title: str,
         meta: dict[str, Any],
+        namespace: str = DEFAULT_NAMESPACE,
     ) -> None:
         self.chunk_id = chunk_id
         self.doc_id = doc_id
@@ -78,6 +79,7 @@ class SearchHit:
         self.source = source
         self.title = title
         self.meta = meta
+        self.namespace = namespace
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -90,6 +92,7 @@ class SearchHit:
             "end": self.end,
             "text": self.text,
             "meta": self.meta,
+            "namespace": self.namespace,
         }
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
@@ -280,13 +283,20 @@ class PersistentIndex:
         self._ensure_loaded()
         if not text or not text.strip():
             raise ValueError(f"refusing to index empty document: {source!r}")
+        if not isinstance(namespace, str) or not namespace.strip():
+            raise ValueError("namespace must be a non-empty string")
+        namespace = namespace.strip()
 
         if doc_id is None:
-            doc_id = f"doc_{_checksum(source + chr(0) + text)}"
+            doc_id = f"doc_{_checksum(namespace + chr(0) + source + chr(0) + text)}"
+        else:
+            # Document IDs share one index-wide keyspace, so namespace the
+            # caller-provided key to prevent cross-tenant chunk collisions.
+            doc_id = f"{doc_id}_{_checksum(namespace)}"
 
         if replace:
             for existing_id, existing in list(self._documents.items()):
-                if existing.source == source:
+                if existing.source == source and existing.namespace == namespace:
                     self.remove_document(existing_id, save=False)
 
         spans: list[ChunkSpan] = chunk_text(
@@ -323,7 +333,12 @@ class PersistentIndex:
         self._index_chunks(new_chunks)
         return doc_id
 
-    def add_file(self, path: str | Path, source: str | None = None) -> str:
+    def add_file(
+        self,
+        path: str | Path,
+        source: str | None = None,
+        namespace: str = DEFAULT_NAMESPACE,
+    ) -> str:
         file_path = Path(path)
         if not file_path.exists():
             raise FileNotFoundError(f"no such file: {file_path}")
@@ -331,14 +346,23 @@ class PersistentIndex:
             raise IsADirectoryError(f"is a directory: {file_path}")
         text = file_path.read_text(encoding="utf-8", errors="replace")
         return self.add_document(
-            text, source=source or str(file_path), meta={"path": str(file_path)}
+            text,
+            source=source or str(file_path),
+            meta={"path": str(file_path)},
+            namespace=namespace,
         )
 
-    def remove_document(self, doc_id: str, save: bool = True) -> bool:
+    def remove_document(
+        self,
+        doc_id: str,
+        save: bool = True,
+        namespace: str | None = None,
+    ) -> bool:
         self._ensure_loaded()
-        doc = self._documents.pop(doc_id, None)
-        if doc is None:
+        doc = self._documents.get(doc_id)
+        if doc is None or (namespace is not None and doc.namespace != namespace):
             return False
+        self._documents.pop(doc_id)
         for chunk_id in doc.chunk_ids:
             self._chunks.pop(chunk_id, None)
         self._rebuild()
@@ -392,6 +416,7 @@ class PersistentIndex:
                     source=doc.source if doc else "",
                     title=doc.title if doc else "",
                     meta=doc.meta if doc else {},
+                    namespace=doc.namespace if doc else DEFAULT_NAMESPACE,
                 )
             )
         return hits
@@ -437,34 +462,70 @@ class PersistentIndex:
 
     # --- introspection -------------------------------------------------------
 
-    def stats(self) -> dict[str, Any]:
+    def stats(self, namespace: str | None = None) -> dict[str, Any]:
         self._ensure_loaded()
+        allowed_docs = [
+            doc for doc in self._documents.values()
+            if namespace is None or doc.namespace == namespace
+        ]
+        allowed_chunks = {
+            chunk_id for doc in allowed_docs for chunk_id in doc.chunk_ids
+        }
+        total_tokens = sum(self._lengths.get(chunk_id, 0) for chunk_id in allowed_chunks)
+        term_count = sum(
+            any(chunk_id in allowed_chunks for chunk_id in posting)
+            for posting in self._postings.values()
+        )
         return {
-            "documents": len(self._documents),
-            "chunks": len(self._chunks),
-            "terms": len(self._postings),
-            "total_tokens": self._total_len,
+            "documents": len(allowed_docs),
+            "chunks": len(allowed_chunks),
+            "terms": term_count,
+            "total_tokens": total_tokens,
             "avg_tokens_per_chunk": (
-                round(self._total_len / len(self._chunks), 1) if self._chunks else 0.0
+                round(total_tokens / len(allowed_chunks), 1) if allowed_chunks else 0.0
             ),
             "params": self.params.as_dict(),
             "path": str(self.path),
         }
 
-    def document(self, doc_id: str) -> Document | None:
+    def document(self, doc_id: str, namespace: str | None = None) -> Document | None:
         self._ensure_loaded()
-        return self._documents.get(doc_id)
+        doc = self._documents.get(doc_id)
+        if doc is not None and namespace is not None and doc.namespace != namespace:
+            return None
+        return doc
 
-    def document_ids(self) -> list[str]:
+    def document_ids(self, namespace: str | None = None) -> list[str]:
         self._ensure_loaded()
-        return list(self._documents)
+        return [
+            doc_id for doc_id, doc in self._documents.items()
+            if namespace is None or doc.namespace == namespace
+        ]
 
-    def sources(self) -> list[str]:
+    def sources(self, namespace: str | None = None) -> list[str]:
         self._ensure_loaded()
-        return sorted(doc.source for doc in self._documents.values())
+        return sorted(
+            doc.source for doc in self._documents.values()
+            if namespace is None or doc.namespace == namespace
+        )
 
-    def clear(self) -> None:
-        self._documents = {}
-        self._chunks = {}
+    def clear(self, namespace: str | None = None) -> None:
+        self._ensure_loaded()
+        if namespace is None:
+            self._documents = {}
+            self._chunks = {}
+        else:
+            removed_ids = {
+                doc_id for doc_id, doc in self._documents.items()
+                if doc.namespace == namespace
+            }
+            self._documents = {
+                doc_id: doc for doc_id, doc in self._documents.items()
+                if doc_id not in removed_ids
+            }
+            self._chunks = {
+                chunk_id: chunk for chunk_id, chunk in self._chunks.items()
+                if chunk.get("doc_id") not in removed_ids
+            }
         self._rebuild()
         self.save()

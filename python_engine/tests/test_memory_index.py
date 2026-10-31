@@ -118,6 +118,56 @@ class TestPersistentIndex:
         assert index.stats()["documents"] == 0
         assert index.search("something") == []
 
+    def test_namespaces_isolate_same_source_and_support_scoped_deletion(
+        self, index: PersistentIndex
+    ) -> None:
+        first_id = index.add_document(
+            "private alpha content", source="shared.md", namespace="user-a"
+        )
+        second_id = index.add_document(
+            "private alpha content", source="shared.md", namespace="user-b"
+        )
+
+        assert first_id != second_id
+        assert index.stats(namespace="user-a")["documents"] == 1
+        assert index.stats(namespace="user-b")["documents"] == 1
+        assert index.search("alpha", namespace="user-a")[0].namespace == "user-a"
+        assert index.document(first_id, namespace="user-b") is None
+        assert index.remove_document(first_id, namespace="user-b") is False
+
+        index.clear(namespace="user-a")
+
+        assert index.stats(namespace="user-a")["documents"] == 0
+        assert index.stats(namespace="user-b")["documents"] == 1
+        assert index.search("alpha", namespace="user-b")
+
+    def test_replacing_a_source_only_changes_its_namespace(
+        self, index: PersistentIndex
+    ) -> None:
+        index.add_document("old alpha", source="shared.md", namespace="user-a")
+        index.add_document("kept beta", source="shared.md", namespace="user-b")
+        index.add_document("new gamma", source="shared.md", namespace="user-a")
+
+        assert index.search("alpha", namespace="user-a") == []
+        assert index.search("gamma", namespace="user-a")
+        assert index.search("beta", namespace="user-b")
+
+    def test_rejects_empty_namespace(self, index: PersistentIndex) -> None:
+        with pytest.raises(ValueError, match="namespace must be a non-empty string"):
+            index.add_document("content", source="a.md", namespace="  ")
+
+    def test_caller_document_ids_are_scoped(self, index: PersistentIndex) -> None:
+        first = index.add_document(
+            "same content", source="a.md", doc_id="shared-id", namespace="user-a"
+        )
+        second = index.add_document(
+            "same content", source="a.md", doc_id="shared-id", namespace="user-b"
+        )
+
+        assert first != second
+        assert index.stats(namespace="user-a")["documents"] == 1
+        assert index.stats(namespace="user-b")["documents"] == 1
+
     def test_top_k_is_respected(self, index: PersistentIndex) -> None:
         for i in range(10):
             index.add_document(f"common term document number {i}", source=f"d{i}.md")
@@ -140,6 +190,27 @@ class TestRetriever:
         report = retriever.index_path(docs)
         assert report["count"] == 2
         assert retriever.search("rate limit")[0].source.endswith("a.md")
+
+    def test_retriever_scopes_search_notes_stats_and_clear(self, tmp_path: Path) -> None:
+        user_a = Retriever(tmp_path / "mem", namespace="user-a")
+        user_b = Retriever(tmp_path / "mem", namespace="user-b")
+        user_a.remember("alpha private note", key="shared")
+        user_b.remember("beta private note", key="shared")
+
+        assert user_a.recall("alpha")
+        assert user_a.recall("beta") == []
+        assert user_b.recall("beta")
+        assert user_b.recall("alpha") == []
+        assert user_a.stats()["documents"] == 1
+        assert user_b.stats()["documents"] == 1
+
+        Retriever(tmp_path / "mem", namespace="user-a").clear()
+
+        reloaded_user_a = Retriever(tmp_path / "mem", namespace="user-a")
+        assert reloaded_user_a.stats()["documents"] == 0
+        reloaded_user_b = Retriever(tmp_path / "mem", namespace="user-b")
+        assert reloaded_user_b.recall("beta")
+        assert len(reloaded_user_b.notes()) == 1
 
     def test_skips_binary_extensions_with_reason(
         self, retriever: Retriever, tmp_path: Path

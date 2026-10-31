@@ -6,8 +6,9 @@ Last updated: 2026-10-31
 
 - Repository: `Rare-Erudite/RARE-INTELLIGENCE-MODEL`
 - Branch: `engine-integration-v0.3.1`
-- Parent HEAD for this checkpoint: `3903d17dd28b8c415d839d05b58da6da94648d91`
-- The local-runtime safety increment is committed separately after its focused tests, TypeScript lint, production build, and diff checks passed. Earlier task-recovery changes remain uncommitted in the worktree.
+- Parent checkpoint: `3903d17dd28b8c415d839d05b58da6da94648d91`
+- Local-runtime safety increment: committed as `59a401f837f90c43975afeb6f0471587e9b6e3bf` after focused tests, TypeScript lint, production build, and diff checks passed.
+- Earlier task-recovery work remains uncommitted in the worktree.
 
 ## Implemented and verified so far
 
@@ -18,6 +19,8 @@ Last updated: 2026-10-31
 - Ollama runtime reporting separates daemon reachability, selected-model installation, loaded state, and whether inference has previously succeeded in this process.
 - The local ONNX provider checks available RAM before initializing the inference runtime and checks disk space before fetching uncached weights.
 - Local provider metadata no longer advertises streaming or function calling where those adapters do not implement them.
+- Python `Retriever` instances now bind search, notes, statistics, corpus ingestion, and clearing to a namespace. Replacement and IDs are namespace-aware, so identical source names and caller IDs do not collide across tenants; namespace is preserved on search hits.
+- The Python memory HTTP/tool layer still uses its configured default retriever namespace; binding an authenticated principal to a per-user namespace is not yet implemented.
 - Real local model inference has not been demonstrated. The development laptop has about 3.68 GiB RAM and about 0.9 GiB free at the prior measurement; configured model estimates plus runtime reserve make the current local models unsuitable at that memory level. No weights were downloaded.
 
 ## Verification record
@@ -25,12 +28,13 @@ Last updated: 2026-10-31
 - Previous checkpoint: TypeScript lint/build passed; Ruff passed; Python fast suite passed 224 tests with 1 skipped and 2 deselected; two additional Python recovery tests passed separately.
 - Previous checkpoint: Python test blockers were Windows symlink privilege error (`WinError 1314`) and an unknown-task CLI test that hung. Standard Node job tests hit `uv_os_get_passwd returned ENOMEM`; their constituent suites passed with a temporary test-only shim.
 - Current local-runtime focused regression tests passed 5/5 using a temporary Node `os.userInfo` test shim, which was removed after the run. TypeScript lint passed and the production build passed (1,674 modules transformed). `git diff --check` passed.
+- Current memory-index test module passed, including namespace isolation, replacement, restart, and scoped clear cases. Ruff passed on the changed memory files and tests.
 
 ## Current phase and next implementation task
 
-Current phase: inference and runtime foundation, with resource-aware readiness in progress.
+Current phase: memory and inference foundations; namespace isolation is implemented in the retrieval layer, while service identity binding remains open.
 
-Next exact task: on hardware with sufficient memory, run a separately gated real-inference smoke test that records model ID, load success, response success, latency, and memory use; then make readiness consume that evidence without loading models during ordinary health checks. Continue afterward with the dynamic planner/executor integration and durable, provenance-aware retrieval.
+Next exact task: derive a trusted memory namespace from the authenticated service principal and pass it through each request's retrieval context, with API-level cross-user tests. Then, on hardware with sufficient memory, add a separately gated real-inference smoke test that records model ID, load success, response success, latency, and memory use without loading models during ordinary health checks.
 
 ## Known limitations
 

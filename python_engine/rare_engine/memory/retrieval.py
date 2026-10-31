@@ -19,7 +19,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .index import Document, PersistentIndex, SearchHit
+from .index import DEFAULT_NAMESPACE, Document, PersistentIndex, SearchHit
 
 # Documents written through ``remember`` are tagged with this source prefix so
 # they can be listed and pruned without touching ingested files.
@@ -45,7 +45,11 @@ class Retriever:
         root: str | Path,
         chunk_chars: int = 1200,
         chunk_overlap: int = 150,
+        namespace: str = DEFAULT_NAMESPACE,
     ) -> None:
+        if not isinstance(namespace, str) or not namespace.strip():
+            raise ValueError("namespace must be a non-empty string")
+        self.namespace = namespace.strip()
         self.index = PersistentIndex(
             root, chunk_chars=chunk_chars, chunk_overlap=chunk_overlap
         )
@@ -87,13 +91,15 @@ class Retriever:
             if not text.strip():
                 report["skipped"].append({"path": str(file), "reason": "empty"})
                 continue
-            self.index.add_document(text, source=str(file), title=file.name)
+            self.index.add_document(
+                text, source=str(file), title=file.name, namespace=self.namespace
+            )
             report["indexed"].append(str(file))
             report["bytes"] += len(text.encode("utf-8"))
 
         self.index.save()
         report["count"] = len(report["indexed"])
-        report["stats"] = self.index.stats()
+        report["stats"] = self.index.stats(namespace=self.namespace)
         return report
 
     @staticmethod
@@ -119,31 +125,38 @@ class Retriever:
             raise ValueError("cannot remember empty text")
         source = f"{NOTE_PREFIX}{key}" if key else f"{NOTE_PREFIX}{time.time_ns()}"
         doc_id = self.index.add_document(
-            text.strip(), source=source, title=key or "note", meta={"kind": "note"}
+            text.strip(),
+            source=source,
+            title=key or "note",
+            meta={"kind": "note"},
+            namespace=self.namespace,
         )
         self.index.save()
         return doc_id
 
     def recall(self, query: str, top_k: int = 5) -> list[SearchHit]:
         """Search across both corpus documents and durable notes."""
-        return self.index.search(query, top_k=top_k)
+        return self.index.search(query, top_k=top_k, namespace=self.namespace)
 
     def notes(self) -> list[Document]:
         """Every durable note, newest source first."""
-        docs = [self.index.document(doc_id) for doc_id in self.index.document_ids()]
+        doc_ids = self.index.document_ids(namespace=self.namespace)
+        docs = [
+            self.index.document(doc_id, namespace=self.namespace) for doc_id in doc_ids
+        ]
         live = [d for d in docs if d is not None and d.source.startswith(NOTE_PREFIX)]
         return sorted(live, key=lambda d: d.source, reverse=True)
 
     # --- query ---------------------------------------------------------------
 
     def search(self, query: str, top_k: int = 5) -> list[SearchHit]:
-        return self.index.search(query, top_k=top_k)
+        return self.index.search(query, top_k=top_k, namespace=self.namespace)
 
     def stats(self) -> dict[str, Any]:
-        return self.index.stats()
+        return self.index.stats(namespace=self.namespace)
 
     def clear(self) -> None:
-        self.index.clear()
+        self.index.clear(namespace=self.namespace)
 
 
 def format_hits(hits: list[SearchHit], max_chars: int = 400) -> str:
