@@ -52,6 +52,12 @@ Deliberate: the tool registry can write files and, when `tools.enable_shell`
 is true, execute shell commands. An unauthenticated engine on a reachable
 network is a remote code execution surface.
 
+The service is currently single-principal because it accepts one shared bearer
+token. Its memory namespace is selected by the trusted `create_app` configuration
+(`memory_namespace`, default `default`); requests cannot switch to another
+namespace. Separate service principals still require a multi-token identity
+mapping before they can share one service instance safely.
+
 ---
 
 ## 3. Endpoints
@@ -78,7 +84,12 @@ from a dead process.
 
 Request:
 ```json
-{ "goal": "Summarise the deployment runbook", "model_id": null, "metadata": {} }
+{
+  "goal": "Summarise the deployment runbook",
+  "model_id": null,
+  "metadata": {},
+  "task_id": "job_abc123"
+}
 ```
 
 Response:
@@ -102,6 +113,15 @@ Response:
 the right shape for long tasks and is on the roadmap; presenting this as async
 when it is not would be worse than the honest limitation.
 
+Callers may supply `task_id` as an idempotency key (maximum 128 characters).
+Repeating the same id and request returns the stored terminal result, or
+safely resumes a non-terminal task from its last completed step. Reusing an id
+with a different goal, metadata, or explicit model id returns `409
+idempotency_key_conflict`. A persisted unfinished step returns `409
+task_not_resumable` because its side effect is uncertain. Requests with the
+same id are serialized within the service process; run one Python worker, as
+the JSON task store does not support concurrent writers across processes.
+
 ### `POST /v1/tasks/{task_id}/resume`
 
 Continues an interrupted task from its last persisted step. Completed steps
@@ -124,7 +144,8 @@ List (max 200) and fetch one task summary.
 → `{ "query": "...", "hits": [{ "doc_id", "source", "score", "text" }], "total_indexed": 12 }`
 
 `top_k` bounded 1–20. No match returns `hits: []` — the retriever does not
-fabricate a match.
+fabricate a match. `namespace` may be omitted or repeat the namespace configured
+for this service; a different namespace returns `403 memory_namespace_forbidden`.
 
 ### `POST /v1/memory/remember`
 
@@ -151,6 +172,8 @@ The TypeScript client surfaces this as `EngineClientError` with `.code` and
 | 401 | `unauthorized` | missing or wrong bearer token |
 | 404 | `task_not_found` | unknown task id |
 | 409 | `task_not_resumable` | resume refused by a state invariant |
+| 409 | `idempotency_key_conflict` | task id reused with a different request |
+| 403 | `memory_namespace_forbidden` | request tried to read outside the configured memory namespace |
 | 422 | — | request validation (pydantic) |
 | 503 | `service_not_configured` | `RARE_SERVICE_TOKEN` unset |
 

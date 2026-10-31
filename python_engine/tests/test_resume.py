@@ -197,6 +197,61 @@ async def test_resume_refuses_unfinished_step(config, scripted):
     assert "unfinished step" in exc.value.message
 
 
+async def test_tool_side_effect_is_checkpointed_before_it_runs(config, scripted, sandbox):
+    """A crash after a tool effect must leave an unfinished step that cannot replay."""
+    store = TaskStore(config.state_path).init()
+    registry = build_registry(config)
+    real_call = registry.call
+    target = sandbox / "crash-window.txt"
+
+    async def write_then_crash(name, action_input):
+        await real_call(name, action_input)
+        raise RuntimeError("simulated process interruption after tool call")
+
+    registry.call = write_then_crash
+    orch = Orchestrator(
+        config,
+        scripted([_action("write_file", path="crash-window.txt", content="once")]),
+        registry,
+        store,
+    )
+    first = await orch.run("write one file")
+
+    assert first.status == TaskStatus.FAILED
+    assert target.read_text() == "once"
+    saved = store.load(first.task_id)
+    assert saved.steps[-1].finished_at is None
+
+    adapter2 = scripted([])
+    with pytest.raises(TaskNotResumableError, match="unfinished step"):
+        await _orch(config, adapter2, store).resume(first.task_id)
+    assert adapter2.calls == 0
+    assert target.read_text() == "once"
+
+
+async def test_failed_action_checkpoint_prevents_tool_side_effect(config, scripted, sandbox):
+    store = TaskStore(config.state_path).init()
+    real_save = store.save
+    checkpoint_failed = False
+    target = sandbox / "must-not-exist.txt"
+
+    def fail_action_checkpoint(state):
+        nonlocal checkpoint_failed
+        if state.step_count and not checkpoint_failed:
+            checkpoint_failed = True
+            raise OSError("simulated task-store write failure")
+        real_save(state)
+
+    store.save = fail_action_checkpoint
+    adapter = scripted([_action("write_file", path="must-not-exist.txt", content="unsafe")])
+    result = await _orch(config, adapter, store).run("write one file")
+
+    assert checkpoint_failed
+    assert result.status == TaskStatus.FAILED
+    assert not target.exists()
+    assert store.load(result.task_id).steps[-1].finished_at is None
+
+
 async def test_resume_refuses_non_contiguous_steps(config, scripted):
     """A gap in step indices means work was lost; refuse rather than skip."""
     store = TaskStore(config.state_path).init()

@@ -8,7 +8,8 @@ Last updated: 2026-10-31
 - Branch: `engine-integration-v0.3.1`
 - Parent checkpoint: `3903d17dd28b8c415d839d05b58da6da94648d91`
 - Local-runtime safety increment: committed as `59a401f837f90c43975afeb6f0471587e9b6e3bf` after focused tests, TypeScript lint, production build, and diff checks passed.
-- Earlier task-recovery work remains uncommitted in the worktree.
+- Namespace-aware retrieval increment: committed as `7c25915` after the memory index tests and Ruff checks passed.
+- Python checkpoint/replay and service namespace changes are recorded in this checkpoint after targeted service and recovery tests passed. Remaining TypeScript job/integration changes stay uncommitted in the worktree.
 
 ## Implemented and verified so far
 
@@ -20,7 +21,8 @@ Last updated: 2026-10-31
 - The local ONNX provider checks available RAM before initializing the inference runtime and checks disk space before fetching uncached weights.
 - Local provider metadata no longer advertises streaming or function calling where those adapters do not implement them.
 - Python `Retriever` instances now bind search, notes, statistics, corpus ingestion, and clearing to a namespace. Replacement and IDs are namespace-aware, so identical source names and caller IDs do not collide across tenants; namespace is preserved on search hits.
-- The Python memory HTTP/tool layer still uses its configured default retriever namespace; binding an authenticated principal to a per-user namespace is not yet implemented.
+- The Python service factory can bind each service instance to a trusted memory namespace, and the search route rejects a request that names a different namespace.
+- Authentication still uses one shared bearer token per service instance. Distinct user/principal identities and per-user task ownership are not yet implemented.
 - Real local model inference has not been demonstrated. The development laptop has about 3.68 GiB RAM and about 0.9 GiB free at the prior measurement; configured model estimates plus runtime reserve make the current local models unsuitable at that memory level. No weights were downloaded.
 
 ## Verification record
@@ -29,12 +31,13 @@ Last updated: 2026-10-31
 - Previous checkpoint: Python test blockers were Windows symlink privilege error (`WinError 1314`) and an unknown-task CLI test that hung. Standard Node job tests hit `uv_os_get_passwd returned ENOMEM`; their constituent suites passed with a temporary test-only shim.
 - Current local-runtime focused regression tests passed 5/5 using a temporary Node `os.userInfo` test shim, which was removed after the run. TypeScript lint passed and the production build passed (1,674 modules transformed). `git diff --check` passed.
 - Current memory-index test module passed, including namespace isolation, replacement, restart, and scoped clear cases. Ruff passed on the changed memory files and tests.
+- Current Python service test module passed, including a shared-index check that app instances only search their configured namespace and reject client namespace overrides. Ruff passed on the service and test changes.
 
 ## Current phase and next implementation task
 
-Current phase: memory and inference foundations; namespace isolation is implemented in the retrieval layer, while service identity binding remains open.
+Current phase: memory and inference foundations; retrieval and per-service namespace scoping are implemented, while multi-principal identity binding remains open.
 
-Next exact task: derive a trusted memory namespace from the authenticated service principal and pass it through each request's retrieval context, with API-level cross-user tests. Then, on hardware with sufficient memory, add a separately gated real-inference smoke test that records model ID, load success, response success, latency, and memory use without loading models during ordinary health checks.
+Next exact task: replace the single shared bearer with an explicit configured principal-to-token mapping, bind task ownership and memory namespace to that trusted principal, and add cross-principal API tests. Then, on hardware with sufficient memory, add a separately gated real-inference smoke test that records model ID, load success, response success, latency, and memory use without loading models during ordinary health checks.
 
 ## Known limitations
 

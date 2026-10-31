@@ -439,6 +439,13 @@ class Orchestrator:
                         steps=state.step_count,
                     )
 
+                # Persist the action before invoking a tool: a process can die
+                # after a filesystem/network side effect but before its result
+                # is saved. On recovery, the unfinished step makes resume fail
+                # closed instead of repeating an uncertain side effect.
+                state.add_step(step)
+                self.store.save(state)
+
                 tool_result = await self.registry.call(action.action, action.action_input)
                 step.ok = tool_result.ok
                 step.observation = tool_result.to_observation()
@@ -446,7 +453,6 @@ class Orchestrator:
                     step.error = tool_result.error
                     step.error_code = tool_result.error_code
                 step.finished_at = _now()
-                state.add_step(step)
                 self.store.save(state)
 
                 log.info(

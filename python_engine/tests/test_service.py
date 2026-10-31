@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 from rare_engine.config import EngineConfig, ModelConfig
 from rare_engine.memory.retrieval import Retriever
 from rare_engine.service import ALLOW_ANONYMOUS_ENV, SERVICE_TOKEN_ENV, create_app
-from rare_engine.state import TaskStore
+from rare_engine.state import StepRecord, TaskState, TaskStatus, TaskStore
 
 TOKEN = "test-service-token"
 
@@ -140,11 +140,7 @@ def test_run_task_rejects_blank_goal(client: TestClient) -> None:
 
 
 def test_client_supplied_task_id_is_honoured(client: TestClient) -> None:
-    """The idempotency key the TypeScript job queue relies on.
-
-    A caller that retries after a crash resends the same task_id, so the
-    engine must overwrite one record rather than create a second.
-    """
+    """The caller's task id is used as the durable idempotency key."""
     r = client.post(
         "/v1/tasks",
         json={"goal": "say hello", "task_id": "job_abc123"},
@@ -157,6 +153,89 @@ def test_client_supplied_task_id_is_honoured(client: TestClient) -> None:
     got = client.get("/v1/tasks/job_abc123", headers=auth())
     assert got.status_code == 200
     assert got.json()["task_id"] == "job_abc123"
+
+
+def test_replaying_terminal_task_id_returns_saved_result_without_rerunning(
+    client: TestClient, config: EngineConfig
+) -> None:
+    payload = {"goal": "say hello", "task_id": "job_replay123", "metadata": {"jobId": "j1"}}
+    first = client.post("/v1/tasks", json=payload, headers=auth())
+    assert first.status_code == 200
+    first_body = first.json()
+    saved_before = TaskStore(config.state_path).load("job_replay123")
+
+    replay = client.post("/v1/tasks", json=payload, headers=auth())
+    assert replay.status_code == 200
+    replay_body = replay.json()
+    for field in ("task_id", "status", "result", "steps", "total_tokens", "error", "error_code"):
+        assert replay_body[field] == first_body[field]
+
+    saved_after = TaskStore(config.state_path).load("job_replay123")
+    assert saved_after.updated_at == saved_before.updated_at
+    assert saved_after.total_tokens == saved_before.total_tokens
+    assert saved_after.step_count == saved_before.step_count
+
+
+def test_replaying_terminal_task_id_after_service_restart_returns_saved_result(
+    client: TestClient, config: EngineConfig, tmp_path: Path
+) -> None:
+    payload = {"goal": "say hello", "task_id": "job_restart123", "metadata": {"jobId": "j3"}}
+    first = client.post("/v1/tasks", json=payload, headers=auth())
+    assert first.status_code == 200
+    first_body = first.json()
+    saved_before = TaskStore(config.state_path).load("job_restart123")
+
+    restarted_app = create_app(
+        config,
+        store=TaskStore(config.state_path),
+        retriever=Retriever(tmp_path / "memory"),
+    )
+    with TestClient(restarted_app) as restarted_client:
+        replay = restarted_client.post("/v1/tasks", json=payload, headers=auth())
+
+    assert replay.status_code == 200
+    replay_body = replay.json()
+    for field in ("task_id", "status", "result", "steps", "total_tokens", "error", "error_code"):
+        assert replay_body[field] == first_body[field]
+
+    saved_after = TaskStore(config.state_path).load("job_restart123")
+    assert saved_after.updated_at == saved_before.updated_at
+    assert saved_after.total_tokens == saved_before.total_tokens
+    assert saved_after.step_count == saved_before.step_count
+
+
+def test_reusing_task_id_with_different_goal_is_conflict(client: TestClient) -> None:
+    first = client.post(
+        "/v1/tasks", json={"goal": "first goal", "task_id": "job_conflict123"}, headers=auth()
+    )
+    assert first.status_code == 200
+
+    replay = client.post(
+        "/v1/tasks", json={"goal": "different goal", "task_id": "job_conflict123"}, headers=auth()
+    )
+    assert replay.status_code == 409
+    assert replay.json()["detail"]["code"] == "idempotency_key_conflict"
+
+
+def test_idempotent_retry_refuses_a_persisted_unfinished_step(
+    client: TestClient, config: EngineConfig
+) -> None:
+    state = TaskState(
+        task_id="job_uncertain123",
+        goal="write one file",
+        status=TaskStatus.RUNNING,
+        metadata={"jobId": "j2"},
+        steps=[StepRecord(step_id="step_001", index=1, action="write_file")],
+    )
+    TaskStore(config.state_path).save(state)
+
+    replay = client.post(
+        "/v1/tasks",
+        json={"goal": "write one file", "task_id": state.task_id, "metadata": {"jobId": "j2"}},
+        headers=auth(),
+    )
+    assert replay.status_code == 409
+    assert replay.json()["detail"]["code"] == "task_not_resumable"
 
 
 def test_omitting_task_id_still_generates_one(client: TestClient) -> None:
@@ -251,6 +330,44 @@ def test_search_top_k_is_bounded(client: TestClient) -> None:
         headers=auth(),
     )
     assert r.status_code == 422
+
+
+def test_service_memory_namespace_is_configured_and_cannot_be_overridden(
+    config: EngineConfig,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(SERVICE_TOKEN_ENV, TOKEN)
+    monkeypatch.delenv(ALLOW_ANONYMOUS_ENV, raising=False)
+    Retriever(config.memory_path, namespace="tenant-a").remember(
+        "alpha private deployment detail", key="shared"
+    )
+    Retriever(config.memory_path, namespace="tenant-b").remember(
+        "beta private deployment detail", key="shared"
+    )
+
+    app = create_app(
+        config,
+        store=TaskStore(config.state_path),
+        memory_namespace="tenant-a",
+    )
+    with TestClient(app) as scoped_client:
+        scoped = scoped_client.post(
+            "/v1/memory/search",
+            json={"query": "deployment detail", "top_k": 5},
+            headers=auth(),
+        )
+        assert scoped.status_code == 200
+        assert scoped.json()["total_indexed"] == 1
+        assert "alpha" in scoped.json()["hits"][0]["text"]
+
+        override = scoped_client.post(
+            "/v1/memory/search",
+            json={"query": "deployment detail", "namespace": "tenant-b"},
+            headers=auth(),
+        )
+        assert override.status_code == 403
+        assert override.json()["detail"]["code"] == "memory_namespace_forbidden"
 
 
 # --- contract shape --------------------------------------------------------

@@ -37,6 +37,7 @@ write files and (when enabled) run shell commands.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 from typing import Any
@@ -48,6 +49,7 @@ from . import __version__
 from .config import EngineConfig, load_config
 from .errors import RareError, TaskNotFoundError, TaskNotResumableError
 from .logging import get_logger
+from .memory.index import DEFAULT_NAMESPACE
 from .memory.retrieval import Retriever
 from .models import build_default_adapter
 from .orchestrator import Orchestrator
@@ -79,10 +81,8 @@ class RunRequest(BaseModel):
     goal: str = Field(..., min_length=1, max_length=8000)
     model_id: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
-    # Client-supplied idempotency key. When a caller retries after a crash it
-    # resends the same task_id, so the engine overwrites one task record
-    # instead of creating a second one. Optional: omitting it keeps the
-    # engine-generated id and the original behaviour.
+    # Client-supplied idempotency key. Replays with the same id and payload
+    # return or safely resume the existing task instead of starting it twice.
     task_id: str | None = Field(default=None, max_length=128)
 
 
@@ -109,6 +109,8 @@ class TaskSummary(BaseModel):
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000)
     top_k: int = Field(default=5, ge=1, le=20)
+    # A caller may repeat the configured tenant scope, but cannot select an
+    # arbitrary namespace from the shared index.
     namespace: str | None = None
 
 
@@ -190,6 +192,7 @@ def create_app(
     registry: ToolRegistry | None = None,
     store: TaskStore | None = None,
     retriever: Retriever | None = None,
+    memory_namespace: str = DEFAULT_NAMESPACE,
 ) -> FastAPI:
     """Build the FastAPI app.
 
@@ -201,7 +204,7 @@ def create_app(
     started = time.perf_counter()
 
     _adapter = adapter or build_default_adapter(cfg)
-    _retriever = retriever or Retriever(cfg.memory_path)
+    _retriever = retriever or Retriever(cfg.memory_path, namespace=memory_namespace)
     # build_registry wires the sandbox path, allowlist and shell policy from
     # config; constructing ToolRegistry directly would need all of them.
     _registry = registry or build_registry(cfg, retriever=_retriever)
@@ -219,6 +222,9 @@ def create_app(
     app.state.registry = _registry
     app.state.store = _store
     app.state.retriever = _retriever
+    # The JSON store has one writer per task. Serialize same-id requests within
+    # this service process; the deployment contract requires one worker.
+    app.state.task_id_locks: dict[str, asyncio.Lock] = {}
 
     def _orchestrator() -> Orchestrator:
         return Orchestrator(cfg, _adapter, _registry, _store)
@@ -258,20 +264,71 @@ def create_app(
         polling is the correct shape for long tasks and is listed in
         ROADMAP.md; pretending this endpoint is async would be worse.
         """
-        try:
+        async def run_or_replay() -> RunResponse:
+            if req.task_id is not None:
+                try:
+                    previous = _store.load(req.task_id)
+                except TaskNotFoundError:
+                    previous = None
+
+                if previous is not None:
+                    if (
+                        previous.goal != req.goal.strip()
+                        or previous.metadata != req.metadata
+                        or (req.model_id is not None and previous.model_id != req.model_id)
+                    ):
+                        raise HTTPException(
+                            status_code=status.HTTP_409_CONFLICT,
+                            detail={
+                                "code": "idempotency_key_conflict",
+                                "message": "task_id was already used with a different request",
+                            },
+                        )
+
+                    if previous.status.terminal and all(
+                        step.finished_at is not None for step in previous.steps
+                    ):
+                        return RunResponse(
+                            task_id=previous.task_id,
+                            status=previous.status.value,
+                            result=previous.result,
+                            steps=previous.step_count,
+                            duration_s=previous.duration_s,
+                            total_tokens=previous.total_tokens,
+                            error=previous.last_error,
+                            error_code=previous.last_error_code,
+                        )
+
+                    # A prior process may have stopped between steps. Resume
+                    # replays completed observations and refuses an unfinished
+                    # step whose side effect is uncertain.
+                    result = await _orchestrator().resume(req.task_id)
+                    return RunResponse(**result.to_dict())
+
             result = await _orchestrator().run(
                 goal=req.goal,
                 model_id=req.model_id,
                 task_id=req.task_id,
                 metadata=req.metadata,
             )
+            return RunResponse(**result.to_dict())
+
+        try:
+            if req.task_id is None:
+                return await run_or_replay()
+            lock = app.state.task_id_locks.setdefault(req.task_id, asyncio.Lock())
+            async with lock:
+                return await run_or_replay()
+        except TaskNotResumableError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"code": "task_not_resumable", "message": str(exc)},
+            ) from exc
         except RareError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={"code": type(exc).__name__, "message": str(exc)},
             ) from exc
-
-        return RunResponse(**result.to_dict())
 
     @app.post(
         "/v1/tasks/{task_id}/resume",
@@ -352,6 +409,14 @@ def create_app(
         dependencies=[Depends(_require_token)],
     )
     async def search(req: SearchRequest) -> SearchResponse:
+        if req.namespace is not None and req.namespace != _retriever.namespace:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "memory_namespace_forbidden",
+                    "message": "Requested memory namespace is outside this service's configured scope.",
+                },
+            )
         hits = _retriever.search(req.query, top_k=req.top_k)
         stats = _retriever.stats()
         return SearchResponse(
