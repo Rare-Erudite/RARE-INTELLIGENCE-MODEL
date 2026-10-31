@@ -94,6 +94,68 @@ describe('Idempotency', () => {
     assert.notEqual(a.id, b.id);
     fs.rmSync(dir, { recursive: true, force: true });
   });
+
+  it('scopes idempotency keys to the owning client', () => {
+    const dir = tmpDir();
+    const q = new JobQueue({ dir });
+    const developer = q.enqueue({
+      goal: 'private developer task',
+      idempotencyKey: 'shared-key',
+      ownerId: 'developer_admin',
+    });
+    const client = q.enqueue({
+      goal: 'client task',
+      idempotencyKey: 'shared-key',
+      ownerId: 'rare_the_sixth_client',
+    });
+
+    assert.notEqual(developer.id, client.id);
+    assert.equal(q.findByIdempotencyKey('shared-key')?.id, developer.id);
+    assert.equal(q.findByIdempotencyKey('shared-key', 'rare_the_sixth_client')?.id, client.id);
+    assert.equal(q.getOwned(developer.id, 'rare_the_sixth_client'), null);
+    assert.equal(q.getOwned(client.id, 'rare_the_sixth_client')?.goal, 'client task');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('rejects a repeated key with a different request for the same owner', () => {
+    const dir = tmpDir();
+    const q = new JobQueue({ dir });
+    q.enqueue({ goal: 'first goal', idempotencyKey: 'same-owner-key', ownerId: 'client_a' });
+
+    assert.throws(
+      () =>
+        q.enqueue({
+          goal: 'different goal',
+          idempotencyKey: 'same-owner-key',
+          ownerId: 'client_a',
+        }),
+      /different request/,
+    );
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('rejects a repeated key with changed metadata for the same owner', () => {
+    const dir = tmpDir();
+    const q = new JobQueue({ dir });
+    q.enqueue({
+      goal: 'same goal',
+      idempotencyKey: 'same-metadata-key',
+      ownerId: 'client_a',
+      metadata: { source: 'first' },
+    });
+
+    assert.throws(
+      () =>
+        q.enqueue({
+          goal: 'same goal',
+          idempotencyKey: 'same-metadata-key',
+          ownerId: 'client_a',
+          metadata: { source: 'second' },
+        }),
+      /different request/,
+    );
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
 });
 
 describe('Crash recovery', () => {

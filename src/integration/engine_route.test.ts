@@ -17,7 +17,7 @@ import { after, before, describe, it } from 'node:test';
 import express from 'express';
 import { AppError } from '../engine/errors/app-error.ts';
 import { authManager } from '../engine/security/auth.ts';
-import { createEngineRouter } from '../integration/engine_route.ts';
+import { createEngineRouter, startJobWorker } from '../integration/engine_route.ts';
 import { JobQueue } from '../jobs/jobQueue.ts';
 
 interface Harness {
@@ -92,6 +92,45 @@ describe('Engine route — feature flag', () => {
 
   it('enqueues nothing when the flag is off', async () => {
     assert.equal(h.queue.list().length, 0);
+  });
+});
+
+describe('Engine worker — retry idempotency', () => {
+  it('sends the stable queue job id to Python on every retry', async () => {
+    const dir = tmpDir();
+    const queue = new JobQueue({ dir });
+    const job = queue.enqueue({ goal: 'perform one bounded task' });
+    const taskIds: Array<string | undefined> = [];
+    let calls = 0;
+    const client = {
+      runTask: async (_goal: string, options: { taskId?: string }) => {
+        taskIds.push(options.taskId);
+        calls += 1;
+        if (calls === 1) {
+          const err: any = new Error('temporary timeout');
+          err.status = 0;
+          err.code = 'TIMEOUT';
+          throw err;
+        }
+        return {
+          status: 'succeeded',
+          taskId: options.taskId!,
+          result: 'done',
+          error: null,
+          errorCode: null,
+        };
+      },
+    };
+    const worker = startJobWorker(queue, client as any, 60_000);
+
+    try {
+      await worker.drain();
+      assert.deepEqual(taskIds, [job.id, job.id]);
+      assert.equal(queue.get(job.id)?.status, 'done');
+    } finally {
+      worker.stop();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -260,6 +299,36 @@ describe('Engine route — idempotency and ownership', () => {
     const second: any = await (await post()).json();
     assert.equal(first.job.id, second.job.id);
     assert.equal(h.queue.list().length, 1);
+  });
+
+  it('does not expose another owner’s job when an idempotency key is reused', async () => {
+    const post = (key: string, goal: string) =>
+      fetch(`${h.url}/api/v1/engine/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify({ goal, idempotencyKey: 'shared-owner-key' }),
+      });
+
+    const developer = (await (await post(DEV_KEY(), 'private developer goal')).json()) as any;
+    const client = (await (await post(CLIENT_KEY(), 'client-owned goal')).json()) as any;
+
+    assert.notEqual(developer.job.id, client.job.id);
+    assert.equal(client.job.goal, 'client-owned goal');
+  });
+
+  it('returns 409 when an owner reuses a key for a different goal', async () => {
+    const post = (goal: string) =>
+      fetch(`${h.url}/api/v1/engine/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEV_KEY()}` },
+        body: JSON.stringify({ goal, idempotencyKey: 'changed-payload-key' }),
+      });
+
+    assert.equal((await post('first goal')).status, 202);
+    const conflict = await post('different goal');
+    assert.equal(conflict.status, 409);
+    const body: any = await conflict.json();
+    assert.equal(body.error.code, 'IDEMPOTENCY_CONFLICT');
   });
 
   it('does not leak a job to a different client', async () => {

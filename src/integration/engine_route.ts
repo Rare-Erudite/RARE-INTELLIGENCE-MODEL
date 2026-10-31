@@ -24,7 +24,12 @@ import express from 'express';
 import { AppError } from '../engine/errors/app-error.js';
 import { authManager, type AuthenticatedRequest } from '../engine/security/auth.js';
 import { EngineClientError, PythonEngineClient } from '../integration/python_engine_client.js';
-import { JobQueue, JobWorker, type JobRecord } from '../jobs/jobQueue.js';
+import {
+  JobIdempotencyConflictError,
+  JobQueue,
+  JobWorker,
+  type JobRecord,
+} from '../jobs/jobQueue.js';
 
 export const FEATURE_FLAG_ENV = 'ENGINE_FEATURE_ENABLED';
 
@@ -181,7 +186,19 @@ export function createEngineRouter(options: EngineRouteOptions = {}): express.Ro
       const auth = req as AuthenticatedRequest;
       const ownerId = (auth as any).clientId ?? null;
 
-      const job = queue.enqueue({ goal, idempotencyKey, ownerId });
+      let job: JobRecord;
+      try {
+        job = queue.enqueue({ goal, idempotencyKey, ownerId });
+      } catch (err) {
+        if (err instanceof JobIdempotencyConflictError) {
+          throw new AppError({
+            code: 'IDEMPOTENCY_CONFLICT',
+            message: err.message,
+            statusCode: 409,
+          });
+        }
+        throw err;
+      }
 
       const client = options.client ?? buildClientFromEnv();
       if (!client) {
@@ -262,12 +279,13 @@ export function createEngineRouter(options: EngineRouteOptions = {}): express.Ro
       const worker = new JobWorker(queue, async (job) => {
         const run = await client.runTask(job.goal, {
           metadata: { jobId: job.id },
+          taskId: job.id,
         });
         if (run.status !== 'succeeded') {
           throw new EngineClientError(
             run.errorCode || 'TASK_FAILED',
             run.error || `task ${run.taskId} ended ${run.status}`,
-            502,
+            ['failed', 'cancelled', 'timed_out'].includes(run.status) ? 422 : 502,
           );
         }
         return { result: run.result ?? '', engineTaskId: run.taskId };
@@ -288,12 +306,15 @@ export function createEngineRouter(options: EngineRouteOptions = {}): express.Ro
  */
 export function startJobWorker(queue: JobQueue, client: PythonEngineClient, intervalMs = 2000) {
   const worker = new JobWorker(queue, async (job) => {
-    const run = await client.runTask(job.goal, { metadata: { jobId: job.id } });
+    const run = await client.runTask(job.goal, {
+      metadata: { jobId: job.id },
+      taskId: job.id,
+    });
     if (run.status !== 'succeeded') {
       throw new EngineClientError(
         run.errorCode || 'TASK_FAILED',
         run.error || `task ${run.taskId} ended ${run.status}`,
-        502,
+        ['failed', 'cancelled', 'timed_out'].includes(run.status) ? 422 : 502,
       );
     }
     return { result: run.result ?? '', engineTaskId: run.taskId };

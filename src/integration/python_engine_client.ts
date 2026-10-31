@@ -203,7 +203,7 @@ export class PythonEngineClient {
   /** Run one task to a terminal state. Blocks until the engine finishes. */
   public async runTask(
     goal: string,
-    options?: { modelId?: string; metadata?: Record<string, unknown> },
+    options?: { modelId?: string; metadata?: Record<string, unknown>; taskId?: string },
   ): Promise<EngineRunResult> {
     const raw = await this.request<RawRunResult>('/v1/tasks', {
       method: 'POST',
@@ -211,6 +211,7 @@ export class PythonEngineClient {
         goal,
         model_id: options?.modelId ?? null,
         metadata: options?.metadata ?? {},
+        task_id: options?.taskId,
       }),
     });
     return this.mapRun(raw);

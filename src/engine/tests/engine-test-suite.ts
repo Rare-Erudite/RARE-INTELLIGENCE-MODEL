@@ -367,7 +367,7 @@ export class EngineTestSuiteRunner {
               uptime_s: 1.5,
             }
           : {
-              task_id: 'task_abc123',
+              task_id: 'job_abc123',
               status: 'succeeded',
               result: 'done',
               steps: 2,
@@ -396,8 +396,8 @@ export class EngineTestSuiteRunner {
         if (health.modelReady !== true) throw new Error('health.modelReady not mapped');
         if (health.uptimeS !== 1.5) throw new Error('health.uptimeS not mapped');
 
-        const run = await client.runTask('do a thing');
-        if (run.taskId !== 'task_abc123') throw new Error('run.taskId not mapped');
+        const run = await client.runTask('do a thing', { taskId: 'job_abc123' });
+        if (run.taskId !== 'job_abc123') throw new Error('run.taskId not mapped');
         if (run.totalTokens !== 42) throw new Error('run.totalTokens not mapped');
         if (run.durationS !== 0.4) throw new Error('run.durationS not mapped');
         if (run.status !== 'succeeded') throw new Error('run.status not mapped');
@@ -414,6 +414,7 @@ export class EngineTestSuiteRunner {
         const sent = JSON.parse(calls[1].init.body);
         if (!('model_id' in sent)) throw new Error('request body must use model_id');
         if (!('goal' in sent)) throw new Error('request body must include goal');
+        if (sent.task_id !== 'job_abc123') throw new Error('request body must preserve task_id');
       } finally {
         globalThis.fetch = originalFetch;
       }

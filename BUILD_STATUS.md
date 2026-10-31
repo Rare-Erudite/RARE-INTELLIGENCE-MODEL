@@ -9,7 +9,8 @@ Last updated: 2026-10-31
 - Parent checkpoint: `3903d17dd28b8c415d839d05b58da6da94648d91`
 - Local-runtime safety increment: committed as `59a401f837f90c43975afeb6f0471587e9b6e3bf` after focused tests, TypeScript lint, production build, and diff checks passed.
 - Namespace-aware retrieval increment: committed as `7c25915` after the memory index tests and Ruff checks passed.
-- Python checkpoint/replay and service namespace changes are recorded in this checkpoint after targeted service and recovery tests passed. Remaining TypeScript job/integration changes stay uncommitted in the worktree.
+- Python checkpoint/replay and service namespace changes are committed after targeted service and recovery tests passed.
+- TypeScript job idempotency and Python-worker integration changes are committed separately after the queue and route test suites passed.
 
 ## Implemented and verified so far
 
@@ -32,6 +33,7 @@ Last updated: 2026-10-31
 - Current local-runtime focused regression tests passed 5/5 using a temporary Node `os.userInfo` test shim, which was removed after the run. TypeScript lint passed and the production build passed (1,674 modules transformed). `git diff --check` passed.
 - Current memory-index test module passed, including namespace isolation, replacement, restart, and scoped clear cases. Ruff passed on the changed memory files and tests.
 - Current Python service test module passed, including a shared-index check that app instances only search their configured namespace and reject client namespace overrides. Ruff passed on the service and test changes.
+- TypeScript queue and engine-route tests passed 37/37 with the temporary Node `os.userInfo` shim, which was removed after the run. TypeScript lint and production build passed.
 
 ## Current phase and next implementation task
 

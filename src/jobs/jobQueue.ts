@@ -19,6 +19,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { isDeepStrictEqual } from 'util';
 
 export type JobStatus = 'pending' | 'running' | 'done' | 'failed';
 
@@ -52,6 +53,13 @@ export interface JobQueueOptions {
   dir?: string;
   /** Injected clock so tests do not rely on wall time. */
   now?: () => number;
+}
+
+export class JobIdempotencyConflictError extends Error {
+  constructor() {
+    super('idempotency key is already associated with a different request');
+    this.name = 'JobIdempotencyConflictError';
+  }
 }
 
 const DEFAULT_MAX_ATTEMPTS = 3;
@@ -170,10 +178,13 @@ export class JobQueue {
     return job;
   }
 
-  public findByIdempotencyKey(key: string): JobRecord | null {
+  public findByIdempotencyKey(key: string, ownerId?: string | null): JobRecord | null {
     if (!this.index) this.load();
     for (const job of (this.index as Map<string, JobRecord>).values()) {
-      if (job.idempotencyKey === key) return job;
+      if (
+        job.idempotencyKey === key &&
+        (ownerId === undefined || (job.ownerId ?? null) === (ownerId ?? null))
+      ) return job;
     }
     return null;
   }
@@ -185,8 +196,17 @@ export class JobQueue {
    */
   public enqueue(options: EnqueueOptions): JobRecord {
     if (options.idempotencyKey) {
-      const existing = this.findByIdempotencyKey(options.idempotencyKey);
-      if (existing) return existing;
+      const ownerId = options.ownerId ?? null;
+      const existing = this.findByIdempotencyKey(options.idempotencyKey, ownerId);
+      if (existing) {
+        if (
+          existing.goal !== options.goal ||
+          !isDeepStrictEqual(existing.metadata ?? {}, options.metadata ?? {})
+        ) {
+          throw new JobIdempotencyConflictError();
+        }
+        return existing;
+      }
     }
 
     const ts = this.now();
